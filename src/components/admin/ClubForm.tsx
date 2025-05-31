@@ -21,6 +21,7 @@ import { useRouter } from "next/navigation";
 import { useToast } from "@/hooks/use-toast";
 import { Icons } from "@/components/icons";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { useState } from "react"; // Added a proper import for useState
 
 const clubFormSchema = z.object({
   name: z.string().min(2, { message: "Name must be at least 2 characters." }),
@@ -123,9 +124,9 @@ export function ClubForm({ club, mode }: ClubFormProps) {
     }
   }
   
-  // Need to import useState for isSubmitting
-  const [_, React] = useState(false); 
-  const { useState } = React;
+  // Removed incorrect useState re-declaration
+  // const [_, React] = useState(false); 
+  // const { useState } = React;
 
   return (
     <Form {...form}>
