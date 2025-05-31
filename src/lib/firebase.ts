@@ -1,3 +1,4 @@
+
 import { initializeApp, getApps, type FirebaseApp } from "firebase/app";
 import { getFirestore, type Firestore } from "firebase/firestore";
 import { getAuth, type Auth } from "firebase/auth";
@@ -15,31 +16,45 @@ const firebaseConfig = {
   measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID || "YOUR_MEASUREMENT_ID" // Optional
 };
 
-let app: FirebaseApp;
-let auth: Auth;
-let firestore: Firestore;
+let app: FirebaseApp | undefined;
+let auth: Auth | undefined;
+let firestore: Firestore | undefined;
 // let analytics;
 
-if (typeof window !== "undefined" && !getApps().length) {
-  app = initializeApp(firebaseConfig);
-  auth = getAuth(app);
-  firestore = getFirestore(app);
-  // analytics = getAnalytics(app); // Enable if you need analytics
-} else if (getApps().length) {
-  app = getApps()[0]!;
-  auth = getAuth(app);
-  firestore = getFirestore(app);
-  // analytics = getAnalytics(app); // Enable if you need analytics
-} else {
-  // This case is for server-side rendering or environments where Firebase might be initialized differently.
-  // For Next.js App Router server components, you might need admin SDK or a different setup.
-  // For simplicity in scaffolding, we rely on client-side initialization.
-  // Production apps might need a more robust server-side Firebase Admin setup.
-  app = initializeApp(firebaseConfig); // Fallback, might not be ideal for all server contexts
-  auth = getAuth(app);
-  firestore = getFirestore(app);
-}
+const isFirebaseConfigured =
+  firebaseConfig.apiKey && firebaseConfig.apiKey !== "YOUR_API_KEY" &&
+  firebaseConfig.authDomain && firebaseConfig.authDomain !== "YOUR_AUTH_DOMAIN" &&
+  firebaseConfig.projectId && firebaseConfig.projectId !== "YOUR_PROJECT_ID";
 
+if (!isFirebaseConfigured) {
+  console.warn(
+    "Firebase is not properly configured. Essential Firebase credentials (apiKey, authDomain, projectId) are missing or are using placeholder values. " +
+    "Please provide your actual Firebase project credentials in the .env file. " +
+    "The application will run without Firebase functionality until configured."
+  );
+} else {
+  if (typeof window !== "undefined" && !getApps().length) {
+    app = initializeApp(firebaseConfig);
+    auth = getAuth(app);
+    firestore = getFirestore(app);
+    // if (firebaseConfig.measurementId && firebaseConfig.measurementId !== "YOUR_MEASUREMENT_ID") {
+    //   analytics = getAnalytics(app); // Enable if you need analytics and it's configured
+    // }
+  } else if (getApps().length) {
+    app = getApps()[0]!;
+    auth = getAuth(app);
+    firestore = getFirestore(app);
+    // if (firebaseConfig.measurementId && firebaseConfig.measurementId !== "YOUR_MEASUREMENT_ID") {
+    //   analytics = getAnalytics(app);
+    // }
+  } else {
+    // This case is for server-side rendering or environments where Firebase might be initialized differently.
+    // With the `isFirebaseConfigured` check, this branch is only hit if config is present.
+    app = initializeApp(firebaseConfig);
+    auth = getAuth(app);
+    firestore = getFirestore(app);
+  }
+}
 
 export { app, auth, firestore };
 
