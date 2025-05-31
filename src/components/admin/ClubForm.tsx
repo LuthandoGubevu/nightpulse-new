@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useForm } from "react-hook-form";
@@ -14,14 +15,17 @@ import {
   FormDescription,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea"; // Assuming you have a Textarea component
-import type { Club, ClubWithId } from "@/types";
+import { Textarea } from "@/components/ui/textarea";
+import type { ClubWithId } from "@/types";
 import { addClubAction, updateClubAction } from "@/actions/clubActions";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/hooks/use-toast";
 import { Icons } from "@/components/icons";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { useState } from "react"; // Added a proper import for useState
+import { useState, useEffect } from "react";
+import { APIProvider, Map, AdvancedMarker } from '@vis.gl/react-google-maps';
+import { mapConfig } from '@/config';
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 const clubFormSchema = z.object({
   name: z.string().min(2, { message: "Name must be at least 2 characters." }),
@@ -45,7 +49,7 @@ const clubFormSchema = z.object({
 type ClubFormValues = z.infer<typeof clubFormSchema>;
 
 interface ClubFormProps {
-  club?: ClubWithId | null; // Make club optional for 'add' mode
+  club?: ClubWithId | null;
   mode: "add" | "edit";
 }
 
@@ -74,6 +78,8 @@ export function ClubForm({ club, mode }: ClubFormProps) {
         thresholdModerate: 100,
         thresholdPacked: 150,
         imageUrl: '',
+        latitude: null,
+        longitude: null,
       };
 
   const form = useForm<ClubFormValues>({
@@ -82,18 +88,101 @@ export function ClubForm({ club, mode }: ClubFormProps) {
     mode: "onChange",
   });
 
+  const [mapApiKeyError, setMapApiKeyError] = useState<string | null>(null);
+  const [markerPosition, setMarkerPosition] = useState<{ lat: number; lng: number } | null>(() => {
+    const lat = defaultValues.latitude;
+    const lng = defaultValues.longitude;
+    if (typeof lat === 'number' && typeof lng === 'number' && !isNaN(lat) && !isNaN(lng)) {
+      return { lat, lng };
+    }
+    return null;
+  });
+
+  const [mapCenter, setMapCenter] = useState<{ lat: number; lng: number }>(() => {
+    const lat = defaultValues.latitude;
+    const lng = defaultValues.longitude;
+    if (typeof lat === 'number' && typeof lng === 'number' && !isNaN(lat) && !isNaN(lng)) {
+      return { lat, lng };
+    }
+    return mapConfig.defaultCenter;
+  });
+
+  useEffect(() => {
+    if (!mapConfig.apiKey) {
+      setMapApiKeyError("Google Maps API Key is not configured. Map functionality will be disabled.");
+    }
+  }, []);
+
+  useEffect(() => {
+    const watchedLat = form.watch('latitude');
+    const watchedLng = form.watch('longitude');
+    if (typeof watchedLat === 'number' && typeof watchedLng === 'number' && !isNaN(watchedLat) && !isNaN(watchedLng)) {
+      const newPos = { lat: watchedLat, lng: watchedLng };
+      if (!markerPosition || markerPosition.lat !== newPos.lat || markerPosition.lng !== newPos.lng) {
+        setMarkerPosition(newPos);
+      }
+      if (mapCenter.lat !== newPos.lat || mapCenter.lng !== newPos.lng) {
+        setMapCenter(newPos);
+      }
+    } else if (markerPosition !== null) {
+      setMarkerPosition(null);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form.watch('latitude'), form.watch('longitude')]);
+
+
+  const handleMapClick = (event: google.maps.MapMouseEvent) => {
+    if (event.detail.latLng) {
+      const lat = parseFloat(event.detail.latLng.lat.toFixed(6));
+      const lng = parseFloat(event.detail.latLng.lng.toFixed(6));
+      form.setValue("latitude", lat, { shouldValidate: true });
+      form.setValue("longitude", lng, { shouldValidate: true });
+      // No need to call setMarkerPosition here, useEffect will handle it
+    }
+  };
+
+  const handleUseCurrentLocation = () => {
+    if (navigator.geolocation) {
+      setIsSubmitting(true); // Indicate loading
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const lat = parseFloat(position.coords.latitude.toFixed(6));
+          const lng = parseFloat(position.coords.longitude.toFixed(6));
+          form.setValue("latitude", lat, { shouldValidate: true });
+          form.setValue("longitude", lng, { shouldValidate: true });
+          // setMapCenter({ lat, lng }); // useEffect will also handle this
+          toast({ title: "Location Updated", description: "Current location fetched successfully." });
+          setIsSubmitting(false);
+        },
+        (error) => {
+          console.error("Error getting current location:", error);
+          toast({ title: "Location Error", description: `Could not fetch current location: ${error.message}`, variant: "destructive" });
+          setIsSubmitting(false);
+        },
+        { timeout: 10000 } // Add a timeout for geolocation
+      );
+    } else {
+      toast({ title: "Location Error", description: "Geolocation is not supported by this browser.", variant: "destructive" });
+    }
+  };
+
+
   async function onSubmit(data: ClubFormValues) {
     setIsSubmitting(true);
     const formData = new FormData();
-    Object.entries(data).forEach(([key, value]) => {
-      if (value !== undefined && value !== null) {
-        formData.append(key, String(value));
-      }
+    
+    // Convert ClubFormValues to FormData, ensuring nullable fields are handled
+    (Object.keys(data) as Array<keyof ClubFormValues>).forEach((key) => {
+        const value = data[key];
+        if (value !== undefined && value !== null) {
+            formData.append(key, String(value));
+        } else if (key === 'latitude' || key === 'longitude') {
+            // Explicitly do not append if null, actions/schema should handle missing optional fields
+            // Or, if your action expects empty strings for nulls:
+            // formData.append(key, ''); 
+        }
     });
     
-    // Special handling for nested objects before they are stringified to FormData
-    // Or ensure actions can parse these directly. For simplicity, flattened for FormData.
-
     let result;
     if (mode === "edit" && club) {
       result = await updateClubAction(club.id, formData);
@@ -108,14 +197,13 @@ export function ClubForm({ club, mode }: ClubFormProps) {
         description: `${data.name} has been successfully ${mode === "edit" ? "updated" : "added"}.`,
       });
       router.push("/admin/clubs");
-      router.refresh(); // Ensure data is refreshed on the redirected page
+      router.refresh();
     } else {
       toast({
         title: `Error ${mode === "edit" ? "Updating" : "Adding"} Club`,
         description: result.error || "An unexpected error occurred.",
         variant: "destructive",
       });
-      // Handle field-specific errors if your action returns them
       if (result.errors) {
         Object.entries(result.errors).forEach(([field, errors]) => {
           form.setError(field as keyof ClubFormValues, { message: (errors as string[]).join(", ") });
@@ -124,10 +212,6 @@ export function ClubForm({ club, mode }: ClubFormProps) {
     }
   }
   
-  // Removed incorrect useState re-declaration
-  // const [_, React] = useState(false); 
-  // const { useState } = React;
-
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
@@ -181,10 +265,13 @@ export function ClubForm({ club, mode }: ClubFormProps) {
 
         <Card>
           <CardHeader>
-            <CardTitle>Location (Optional)</CardTitle>
-            <CardDescription>Coordinates for map display. Leave blank if not applicable.</CardDescription>
+            <CardTitle>Location</CardTitle>
+            <CardDescription>
+              Set coordinates by clicking the map, entering manually, or using current location.
+            </CardDescription>
           </CardHeader>
-          <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
              <FormField
               control={form.control}
               name="latitude"
@@ -211,6 +298,46 @@ export function ClubForm({ club, mode }: ClubFormProps) {
                 </FormItem>
               )}
             />
+            </div>
+            <Button type="button" variant="outline" onClick={handleUseCurrentLocation} className="w-full md:w-auto" disabled={isSubmitting}>
+              {isSubmitting && navigator.geolocation ? <Icons.spinner className="mr-2 h-4 w-4 animate-spin" /> : <Icons.mapPin className="mr-2 h-4 w-4" />}
+               Use Current Location
+            </Button>
+
+            {mapApiKeyError && (
+              <Alert variant="destructive">
+                <Icons.warning className="h-4 w-4" />
+                <AlertTitle>Map Configuration Error</AlertTitle>
+                <AlertDescription>{mapApiKeyError}</AlertDescription>
+              </Alert>
+            )}
+
+            {!mapApiKeyError && mapConfig.apiKey && (
+              <div className="h-96 w-full rounded-md border overflow-hidden">
+                <APIProvider apiKey={mapConfig.apiKey}>
+                  <Map
+                    center={mapCenter}
+                    zoom={markerPosition ? 15 : mapConfig.defaultZoom}
+                    gestureHandling={'greedy'}
+                    disableDefaultUI={true}
+                    onClick={handleMapClick}
+                    mapId="club-form-map-123" // Ensure unique mapId
+                    className="h-full w-full"
+                  >
+                    {markerPosition && <AdvancedMarker position={markerPosition} title="Selected Location" />}
+                  </Map>
+                </APIProvider>
+              </div>
+            )}
+             {!mapConfig.apiKey && !mapApiKeyError && (
+                <Alert variant="destructive">
+                <Icons.warning className="h-4 w-4" />
+                <AlertTitle>Map Display Disabled</AlertTitle>
+                <AlertDescription>
+                    Google Maps API Key is not configured. Please set the <code className="bg-primary/10 text-primary font-mono p-1 rounded-sm text-xs">NEXT_PUBLIC_GOOGLE_MAPS_API_KEY</code> environment variable. Map functionality will be unavailable.
+                </AlertDescription>
+                </Alert>
+            )}
           </CardContent>
         </Card>
         
@@ -227,7 +354,7 @@ export function ClubForm({ club, mode }: ClubFormProps) {
                 <FormItem>
                   <FormLabel>Current Crowd Count</FormLabel>
                   <FormControl>
-                    <Input type="number" {...field} />
+                    <Input type="number" {...field} onChange={e => field.onChange(parseInt(e.target.value, 10) || 0)} />
                   </FormControl>
                   <FormDescription>This value is typically updated by the mobile app.</FormDescription>
                   <FormMessage />
@@ -242,7 +369,7 @@ export function ClubForm({ club, mode }: ClubFormProps) {
                 <FormItem>
                   <FormLabel>Low Threshold</FormLabel>
                   <FormControl>
-                    <Input type="number" {...field} />
+                    <Input type="number" {...field} onChange={e => field.onChange(parseInt(e.target.value, 10) || 0)} />
                   </FormControl>
                   <FormDescription>Crowd count for 'Low' status.</FormDescription>
                   <FormMessage />
@@ -256,7 +383,7 @@ export function ClubForm({ club, mode }: ClubFormProps) {
                 <FormItem>
                   <FormLabel>Moderate Threshold</FormLabel>
                   <FormControl>
-                    <Input type="number" {...field} />
+                    <Input type="number" {...field} onChange={e => field.onChange(parseInt(e.target.value, 10) || 0)} />
                   </FormControl>
                   <FormDescription>Crowd count for 'Moderate' status.</FormDescription>
                   <FormMessage />
@@ -270,7 +397,7 @@ export function ClubForm({ club, mode }: ClubFormProps) {
                 <FormItem>
                   <FormLabel>Packed Threshold</FormLabel>
                   <FormControl>
-                    <Input type="number" {...field} />
+                    <Input type="number" {...field} onChange={e => field.onChange(parseInt(e.target.value, 10) || 0)} />
                   </FormControl>
                   <FormDescription>Crowd count for 'Packed' status.</FormDescription>
                   <FormMessage />
@@ -282,11 +409,11 @@ export function ClubForm({ club, mode }: ClubFormProps) {
         </Card>
 
         <div className="flex justify-end space-x-2">
-          <Button type="button" variant="outline" onClick={() => router.back()}>
+          <Button type="button" variant="outline" onClick={() => router.back()} disabled={isSubmitting}>
             Cancel
           </Button>
           <Button type="submit" disabled={isSubmitting}>
-            {isSubmitting && <Icons.spinner className="mr-2 h-4 w-4 animate-spin" />}
+            {isSubmitting && !navigator.geolocation ? <Icons.spinner className="mr-2 h-4 w-4 animate-spin" /> : null}
             {mode === "add" ? "Add Club" : "Save Changes"}
           </Button>
         </div>
@@ -294,3 +421,6 @@ export function ClubForm({ club, mode }: ClubFormProps) {
     </Form>
   );
 }
+
+
+    
