@@ -1,4 +1,3 @@
-"use server"; // Marking as server component to fetch data initially
 
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
