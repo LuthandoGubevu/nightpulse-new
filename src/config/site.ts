@@ -12,12 +12,17 @@ export const siteConfig = {
     },
     {
       title: "Dashboard",
-      href: "/dashboard", // User dashboard
+      href: "/dashboard", // User dashboard, shown when logged in
     },
     {
-      title: "Manage Clubs",
+      title: "Manage Clubs", // Admin section, shown when logged in (could be role-based later)
       href: "/admin/clubs",
     },
+    // Example of a public link:
+    // {
+    //   title: "Pricing",
+    //   href: "/pricing",
+    // },
   ],
   links: {
     // Add external links if any, e.g., GitHub repo
