@@ -1,3 +1,4 @@
+
 "use server";
 
 import { revalidatePath } from "next/cache";
@@ -5,6 +6,7 @@ import { firestore } from "@/lib/firebase";
 import { collection, addDoc, doc, updateDoc, deleteDoc, Timestamp, getDoc } from "firebase/firestore";
 import type { Club } from "@/types";
 import { z } from "zod";
+import { parseCommaSeparatedString } from "@/lib/utils";
 
 const ClubSchema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -20,6 +22,16 @@ const ClubSchema = z.object({
     packed: z.number().min(0),
   }),
   imageUrl: z.string().url().optional().or(z.literal('')),
+  estimatedWaitTime: z.string().optional().or(z.literal('')),
+  tags: z.string().optional().transform(val => parseCommaSeparatedString(val)), // Comma-separated string from form
+  musicGenres: z.string().optional().transform(val => parseCommaSeparatedString(val)), // Comma-separated string from form
+  tonightDJ: z.string().optional().or(z.literal('')),
+  announcementMessage: z.string().optional().or(z.literal('')),
+  announcementExpiresAt: z.string().optional().nullable().transform(val => { // Expecting a string that can be converted to Date
+    if (!val) return null;
+    const date = new Date(val);
+    return isNaN(date.getTime()) ? null : Timestamp.fromDate(date);
+  }),
 });
 
 export async function addClubAction(formData: FormData) {
@@ -39,28 +51,48 @@ export async function addClubAction(formData: FormData) {
       packed: parseInt(formData.get("thresholdPacked") as string || "0", 10),
     },
     imageUrl: formData.get("imageUrl"),
+    estimatedWaitTime: formData.get("estimatedWaitTime"),
+    tags: formData.get("tags"),
+    musicGenres: formData.get("musicGenres"),
+    tonightDJ: formData.get("tonightDJ"),
+    announcementMessage: formData.get("announcementMessage"),
+    announcementExpiresAt: formData.get("announcementExpiresAt") as string | null,
   };
   
-  // If lat/lng are not provided or invalid, set location to null
   if (isNaN(rawData.location.lat) || isNaN(rawData.location.lng)) {
-    rawData.location = null as any; // Zod will handle nullable
+    rawData.location = null as any; 
   }
 
   const validation = ClubSchema.safeParse(rawData);
 
   if (!validation.success) {
+    console.error("Validation errors:", validation.error.flatten().fieldErrors);
     return { success: false, error: "Validation failed", errors: validation.error.flatten().fieldErrors };
   }
   
-  const clubData: Omit<Club, 'lastUpdated'> & { lastUpdated: Timestamp } = {
-    ...validation.data,
+  const clubDataValidated = validation.data;
+
+  // Explicitly structure the data for Firestore, especially for Timestamp
+  const clubDataForFirestore: Omit<Club, 'lastUpdated'> & { lastUpdated: Timestamp } = {
+    name: clubDataValidated.name,
+    address: clubDataValidated.address,
+    location: clubDataValidated.location,
+    currentCount: clubDataValidated.currentCount,
+    capacityThresholds: clubDataValidated.capacityThresholds,
+    imageUrl: clubDataValidated.imageUrl || '',
+    estimatedWaitTime: clubDataValidated.estimatedWaitTime || '',
+    tags: clubDataValidated.tags || [],
+    musicGenres: clubDataValidated.musicGenres || [],
+    tonightDJ: clubDataValidated.tonightDJ || '',
+    announcementMessage: clubDataValidated.announcementMessage || '',
+    announcementExpiresAt: clubDataValidated.announcementExpiresAt, // Already a Timestamp or null from Zod transform
     lastUpdated: Timestamp.now(),
   };
 
   try {
-    await addDoc(collection(firestore, "clubs"), clubData);
+    await addDoc(collection(firestore, "clubs"), clubDataForFirestore);
     revalidatePath("/admin/clubs");
-    revalidatePath("/");
+    revalidatePath("/"); // For user dashboard
     return { success: true };
   } catch (error) {
     console.error("Error adding club:", error);
@@ -85,6 +117,12 @@ export async function updateClubAction(clubId: string, formData: FormData) {
       packed: parseInt(formData.get("thresholdPacked") as string || "0", 10),
     },
     imageUrl: formData.get("imageUrl"),
+    estimatedWaitTime: formData.get("estimatedWaitTime"),
+    tags: formData.get("tags"),
+    musicGenres: formData.get("musicGenres"),
+    tonightDJ: formData.get("tonightDJ"),
+    announcementMessage: formData.get("announcementMessage"),
+    announcementExpiresAt: formData.get("announcementExpiresAt") as string | null,
   };
 
   if (isNaN(rawData.location.lat) || isNaN(rawData.location.lng)) {
@@ -94,20 +132,35 @@ export async function updateClubAction(clubId: string, formData: FormData) {
   const validation = ClubSchema.safeParse(rawData);
 
   if (!validation.success) {
+    console.error("Validation errors:", validation.error.flatten().fieldErrors);
     return { success: false, error: "Validation failed", errors: validation.error.flatten().fieldErrors };
   }
 
-  const clubData: Partial<Omit<Club, 'lastUpdated'>> & { lastUpdated: Timestamp } = {
-    ...validation.data,
+  const clubDataValidated = validation.data;
+
+  const clubDataForFirestore: Partial<Omit<Club, 'lastUpdated'>> & { lastUpdated: Timestamp } = {
+    name: clubDataValidated.name,
+    address: clubDataValidated.address,
+    location: clubDataValidated.location,
+    currentCount: clubDataValidated.currentCount,
+    capacityThresholds: clubDataValidated.capacityThresholds,
+    imageUrl: clubDataValidated.imageUrl || '',
+    estimatedWaitTime: clubDataValidated.estimatedWaitTime || '',
+    tags: clubDataValidated.tags || [],
+    musicGenres: clubDataValidated.musicGenres || [],
+    tonightDJ: clubDataValidated.tonightDJ || '',
+    announcementMessage: clubDataValidated.announcementMessage || '',
+    announcementExpiresAt: clubDataValidated.announcementExpiresAt,
     lastUpdated: Timestamp.now(),
   };
 
+
   try {
     const clubRef = doc(firestore, "clubs", clubId);
-    await updateDoc(clubRef, clubData);
+    await updateDoc(clubRef, clubDataForFirestore);
     revalidatePath("/admin/clubs");
     revalidatePath(`/admin/clubs/edit/${clubId}`);
-    revalidatePath("/");
+    revalidatePath("/"); // For user dashboard
     return { success: true };
   } catch (error) {
     console.error("Error updating club:", error);
@@ -128,6 +181,18 @@ export async function deleteClubAction(clubId: string) {
   }
 }
 
+// Helper function to convert Firestore Timestamps in club data if necessary
+const convertClubTimestamps = (data: any): Omit<Club, 'lastUpdated' | 'announcementExpiresAt'> & { lastUpdated: string, announcementExpiresAt: string | null } => {
+  return {
+    ...data,
+    lastUpdated: data.lastUpdated instanceof Timestamp ? data.lastUpdated.toDate().toISOString() : new Date(data.lastUpdated).toISOString(),
+    announcementExpiresAt: data.announcementExpiresAt ? 
+      (data.announcementExpiresAt instanceof Timestamp ? data.announcementExpiresAt.toDate().toISOString() : new Date(data.announcementExpiresAt).toISOString()) 
+      : null,
+  };
+};
+
+
 export async function getClubById(clubId: string): Promise<Club | null> {
   if (!firestore) {
     console.error("Firestore not initialized.");
@@ -139,11 +204,11 @@ export async function getClubById(clubId: string): Promise<Club | null> {
 
     if (clubSnap.exists()) {
       const data = clubSnap.data();
+      const clubWithConvertedTimestamps = convertClubTimestamps(data);
       return {
         id: clubSnap.id,
-        ...data,
-        lastUpdated: data.lastUpdated instanceof Timestamp ? data.lastUpdated.toDate().toISOString() : new Date().toISOString(),
-      } as Club; // Type assertion, ensure data matches Club structure
+        ...clubWithConvertedTimestamps,
+      } as Club;
     } else {
       return null;
     }

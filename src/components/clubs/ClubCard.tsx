@@ -1,3 +1,4 @@
+
 "use client";
 
 import Image from "next/image";
@@ -9,6 +10,9 @@ import { WaitTimeDialog } from "./WaitTimeDialog";
 import type { ClubWithId, ClubStatus } from "@/types";
 import { getClubStatus, formatDate } from "@/lib/utils";
 import { useState } from "react";
+import { Badge } from "@/components/ui/badge";
+import { ClubTimelineDialog } from "./ClubTimelineDialog"; // New import
+import { Timestamp } from "firebase/firestore";
 
 interface ClubCardProps {
   club: ClubWithId;
@@ -16,6 +20,8 @@ interface ClubCardProps {
 
 export function ClubCard({ club }: ClubCardProps) {
   const [isWaitTimeDialogOpen, setIsWaitTimeDialogOpen] = useState(false);
+  const [isTimelineDialogOpen, setIsTimelineDialogOpen] = useState(false); // New state for timeline dialog
+
   const status: ClubStatus = getClubStatus(club.currentCount, club.capacityThresholds);
 
   const statusTextMap: Record<ClubStatus, string> = {
@@ -24,6 +30,17 @@ export function ClubCard({ club }: ClubCardProps) {
     packed: "Packed",
     "over-packed": "Very Packed",
     unknown: "Unknown",
+  };
+
+  const isAnnouncementActive = () => {
+    if (!club.announcementMessage) return false;
+    if (!club.announcementExpiresAt) return true; // No expiry means always active if message exists
+    
+    const expiryDate = club.announcementExpiresAt instanceof Timestamp 
+      ? club.announcementExpiresAt.toDate() 
+      : new Date(club.announcementExpiresAt as string | Date); // Cast needed if it's string
+
+    return expiryDate > new Date();
   };
 
   return (
@@ -36,44 +53,98 @@ export function ClubCard({ club }: ClubCardProps) {
             width={600}
             height={400}
             className="w-full h-48 object-cover"
-            data-ai-hint="nightclub nightlife"
+            data-ai-hint="nightclub party"
           />
            <div className="absolute top-2 right-2 bg-background/80 p-1.5 rounded-full">
              <ClubStatusIndicator status={status} size="lg" />
            </div>
+           {club.isTrending && (
+             <Badge variant="destructive" className="absolute top-2 left-2 animate-pulse">
+               <Icons.trendingUp className="mr-1 h-3 w-3" /> Trending Now
+             </Badge>
+           )}
         </CardHeader>
-        <CardContent className="p-6 flex-grow">
+        <CardContent className="p-6 flex-grow space-y-3">
           <CardTitle className="text-2xl font-headline mb-1">{club.name}</CardTitle>
-          <CardDescription className="text-muted-foreground mb-3 flex items-center">
-            <Icons.mapPin className="h-4 w-4 mr-2" />
+          <CardDescription className="text-muted-foreground mb-1 flex items-center">
+            <Icons.mapPin className="h-4 w-4 mr-2 flex-shrink-0" />
             {club.address}
           </CardDescription>
           
-          <div className="flex items-center space-x-2 mb-1">
+          {club.distance !== undefined && (
+            <p className="text-sm text-muted-foreground">
+              <Icons.navigation className="inline h-4 w-4 mr-1" /> 
+              {club.distance.toFixed(1)} km away
+            </p>
+          )}
+
+          <div className="flex items-baseline space-x-2">
             <Icons.users className="h-5 w-5 text-primary" />
             <span className="text-lg font-semibold">{club.currentCount}</span>
-            <span className="text-sm text-muted-foreground">people currently</span>
+            <span className="text-sm text-muted-foreground">people</span>
+            <ClubStatusIndicator status={status} size="sm"/>
+            <span className="text-sm font-medium">{statusTextMap[status]}</span>
           </div>
-          <div className="flex items-center space-x-2 mb-3">
-             <ClubStatusIndicator status={status} size="sm"/>
-             <span className="text-sm font-medium">{statusTextMap[status]}</span>
-          </div>
-          <p className="text-xs text-muted-foreground">
-            Last updated: {formatDate(club.lastUpdated)}
-          </p>
+
+          {club.estimatedWaitTime && (
+            <div className="flex items-center space-x-2">
+              <Icons.clock className="h-5 w-5 text-primary" />
+              <span className="text-sm">Est. Wait: <span className="font-semibold">{club.estimatedWaitTime}</span></span>
+            </div>
+          )}
+          
+          {isAnnouncementActive() && club.announcementMessage && (
+            <div className="mt-2 p-2 bg-accent/10 border border-accent/30 rounded-md">
+              <p className="text-xs font-semibold text-accent flex items-center">
+                <Icons.bellRing className="h-4 w-4 mr-1.5" /> Announcement
+              </p>
+              <p className="text-xs text-accent/90">{club.announcementMessage}</p>
+            </div>
+          )}
+
+          {(club.musicGenres && club.musicGenres.length > 0) && (
+            <div className="text-xs text-muted-foreground">
+              <span className="font-medium">Music:</span> {club.musicGenres.join(', ')}
+            </div>
+          )}
+          {club.tonightDJ && (
+            <div className="text-xs text-muted-foreground">
+              <span className="font-medium">DJ Tonight:</span> {club.tonightDJ}
+            </div>
+          )}
+          
+          {club.tags && club.tags.length > 0 && (
+            <div className="mt-2 flex flex-wrap gap-1">
+              {club.tags.map(tag => (
+                <Badge key={tag} variant="secondary" className="text-xs">{tag}</Badge>
+              ))}
+            </div>
+          )}
         </CardContent>
-        <CardFooter className="p-6 border-t">
+        <CardFooter className="p-6 border-t grid grid-cols-2 gap-2">
           <Button onClick={() => setIsWaitTimeDialogOpen(true)} className="w-full bg-accent hover:bg-accent/90 text-accent-foreground">
             <Icons.clock className="mr-2 h-4 w-4" />
-            Estimate Wait Time
+            AI Wait Time
+          </Button>
+          <Button onClick={() => setIsTimelineDialogOpen(true)} variant="outline" className="w-full">
+            <Icons.barChartBig className="mr-2 h-4 w-4" />
+            Crowd Timeline
           </Button>
         </CardFooter>
       </Card>
+
       {isWaitTimeDialogOpen && (
         <WaitTimeDialog
           club={club}
           isOpen={isWaitTimeDialogOpen}
           onOpenChange={setIsWaitTimeDialogOpen}
+        />
+      )}
+      {isTimelineDialogOpen && (
+        <ClubTimelineDialog 
+          club={club}
+          isOpen={isTimelineDialogOpen}
+          onOpenChange={setIsTimelineDialogOpen}
         />
       )}
     </>

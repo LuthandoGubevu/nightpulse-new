@@ -27,6 +27,7 @@ import { APIProvider, Map, AdvancedMarker } from '@vis.gl/react-google-maps';
 import type { AdvancedMarkerDragEvent } from '@vis.gl/react-google-maps';
 import { mapConfig } from '@/config';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Timestamp } from "firebase/firestore"; // Import Timestamp
 
 const clubFormSchema = z.object({
   name: z.string().min(2, { message: "Name must be at least 2 characters." }),
@@ -38,6 +39,12 @@ const clubFormSchema = z.object({
   thresholdModerate: z.coerce.number().min(0),
   thresholdPacked: z.coerce.number().min(0),
   imageUrl: z.string().url({ message: "Please enter a valid URL." }).optional().or(z.literal('')),
+  estimatedWaitTime: z.string().optional().or(z.literal('')),
+  tags: z.string().optional(), // Comma-separated string
+  musicGenres: z.string().optional(), // Comma-separated string
+  tonightDJ: z.string().optional().or(z.literal('')),
+  announcementMessage: z.string().optional().or(z.literal('')),
+  announcementExpiresAt: z.string().optional().nullable(), // String input for date/time
 }).refine(data => data.thresholdModerate > data.thresholdLow, {
   message: "Moderate threshold must be greater than Low threshold.",
   path: ["thresholdModerate"],
@@ -53,6 +60,25 @@ interface ClubFormProps {
   club?: ClubWithId | null;
   mode: "add" | "edit";
 }
+
+// Helper to format Date/Timestamp to string for input field
+const formatDateForInput = (date: Timestamp | Date | string | null | undefined): string => {
+  if (!date) return '';
+  try {
+    const d = date instanceof Timestamp ? date.toDate() : new Date(date);
+    if (isNaN(d.getTime())) return '';
+    // Format to YYYY-MM-DDTHH:mm (datetime-local input format)
+    const year = d.getFullYear();
+    const month = (d.getMonth() + 1).toString().padStart(2, '0');
+    const day = d.getDate().toString().padStart(2, '0');
+    const hours = d.getHours().toString().padStart(2, '0');
+    const minutes = d.getMinutes().toString().padStart(2, '0');
+    return `${year}-${month}-${day}T${hours}:${minutes}`;
+  } catch {
+    return '';
+  }
+};
+
 
 export function ClubForm({ club, mode }: ClubFormProps) {
   const router = useRouter();
@@ -70,6 +96,12 @@ export function ClubForm({ club, mode }: ClubFormProps) {
         thresholdModerate: club.capacityThresholds.moderate,
         thresholdPacked: club.capacityThresholds.packed,
         imageUrl: club.imageUrl || '',
+        estimatedWaitTime: club.estimatedWaitTime || '',
+        tags: club.tags?.join(', ') || '',
+        musicGenres: club.musicGenres?.join(', ') || '',
+        tonightDJ: club.tonightDJ || '',
+        announcementMessage: club.announcementMessage || '',
+        announcementExpiresAt: club.announcementExpiresAt ? formatDateForInput(club.announcementExpiresAt) : '',
       }
     : {
         name: "",
@@ -79,6 +111,12 @@ export function ClubForm({ club, mode }: ClubFormProps) {
         thresholdModerate: 100,
         thresholdPacked: 150,
         imageUrl: '',
+        estimatedWaitTime: '',
+        tags: '',
+        musicGenres: '',
+        tonightDJ: '',
+        announcementMessage: '',
+        announcementExpiresAt: '',
         latitude: null,
         longitude: null,
       };
@@ -125,14 +163,14 @@ export function ClubForm({ club, mode }: ClubFormProps) {
         if (typeof lat === 'number' && typeof lng === 'number' && !isNaN(lat) && !isNaN(lng)) {
           const newPos = { lat, lng };
           setMarkerPosition(newPos);
-          setMapCenter(newPos); // Also update map center when coords change
+          setMapCenter(newPos); 
         } else {
           setMarkerPosition(null);
         }
       }
     });
     return () => subscription.unsubscribe();
-  }, [form.watch]);
+  }, [form, form.watch]); // Added form to dependency array
 
 
   const handleMapClick = (event: google.maps.MapMouseEvent) => {
@@ -141,7 +179,6 @@ export function ClubForm({ club, mode }: ClubFormProps) {
       const lng = parseFloat(event.detail.latLng.lng.toFixed(6));
       form.setValue("latitude", lat, { shouldValidate: true, shouldDirty: true });
       form.setValue("longitude", lng, { shouldValidate: true, shouldDirty: true });
-      // useEffect will update markerPosition and mapCenter
     }
   };
 
@@ -151,13 +188,12 @@ export function ClubForm({ club, mode }: ClubFormProps) {
         const lng = parseFloat(event.marker.position.lng.toFixed(6));
         form.setValue("latitude", lat, { shouldValidate: true, shouldDirty: true });
         form.setValue("longitude", lng, { shouldValidate: true, shouldDirty: true });
-        // useEffect will update markerPosition and mapCenter
     }
   };
 
   const handleUseCurrentLocation = () => {
     if (navigator.geolocation) {
-      setIsSubmitting(true); // Indicate loading
+      setIsSubmitting(true); 
       navigator.geolocation.getCurrentPosition(
         (position) => {
           const lat = parseFloat(position.coords.latitude.toFixed(6));
@@ -188,6 +224,8 @@ export function ClubForm({ club, mode }: ClubFormProps) {
         const value = data[key];
         if (value !== undefined && value !== null) {
             formData.append(key, String(value));
+        } else if (key === 'announcementExpiresAt' && value === null) {
+            formData.append(key, ''); // Send empty string if null for Zod transform
         }
     });
     
@@ -307,7 +345,7 @@ export function ClubForm({ club, mode }: ClubFormProps) {
               )}
             />
             </div>
-            <Button type="button" variant="outline" onClick={handleUseCurrentLocation} className="w-full md:w-auto" disabled={isSubmitting}>
+            <Button type="button" variant="outline" onClick={handleUseCurrentLocation} className="w-full md:w-auto" disabled={isSubmitting && !!navigator.geolocation}>
               {isSubmitting && navigator.geolocation ? <Icons.spinner className="mr-2 h-4 w-4 animate-spin" /> : <Icons.mapPin className="mr-2 h-4 w-4" />}
                Use Current Location
             </Button>
@@ -359,7 +397,7 @@ export function ClubForm({ club, mode }: ClubFormProps) {
         <Card>
           <CardHeader>
             <CardTitle>Crowd & Capacity</CardTitle>
-            <CardDescription>Set current crowd count and capacity thresholds.</CardDescription>
+            <CardDescription>Set current crowd count, thresholds, and estimated wait time.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <FormField
@@ -372,6 +410,20 @@ export function ClubForm({ club, mode }: ClubFormProps) {
                     <Input type="number" {...field} onChange={e => field.onChange(parseInt(e.target.value, 10) || 0)} />
                   </FormControl>
                   <FormDescription>This value can be manually overridden here or updated by other mechanisms.</FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="estimatedWaitTime"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Estimated Wait Time (Optional)</FormLabel>
+                  <FormControl>
+                    <Input placeholder="e.g., 15-20 minutes, No wait" {...field} />
+                  </FormControl>
+                  <FormDescription>Manually set the estimated wait time to be displayed to users.</FormDescription>
                   <FormMessage />
                 </FormItem>
               )}
@@ -423,12 +475,89 @@ export function ClubForm({ club, mode }: ClubFormProps) {
           </CardContent>
         </Card>
 
+        <Card>
+          <CardHeader>
+            <CardTitle>Details & Promotion</CardTitle>
+            <CardDescription>Add tags, music genres, DJ info, and announcements.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <FormField
+              control={form.control}
+              name="tags"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Tags (Optional, comma-separated)</FormLabel>
+                  <FormControl>
+                    <Input placeholder="e.g., rooftop, free entry, student night" {...field} />
+                  </FormControl>
+                  <FormDescription>Help users filter and find your club.</FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="musicGenres"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Music Genres (Optional, comma-separated)</FormLabel>
+                  <FormControl>
+                    <Input placeholder="e.g., Afrobeats, Amapiano, Hip Hop" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="tonightDJ"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Tonight's DJ (Optional)</FormLabel>
+                  <FormControl>
+                    <Input placeholder="e.g., DJ Pulse" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="announcementMessage"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Announcement (Optional)</FormLabel>
+                  <FormControl>
+                    <Textarea placeholder="e.g., Happy Hour 8-10 PM! 2-for-1 on selected cocktails." {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="announcementExpiresAt"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Announcement Expiry (Optional)</FormLabel>
+                  <FormControl>
+                    <Input type="datetime-local" {...field} value={field.value || ''} />
+                  </FormControl>
+                  <FormDescription>When this announcement should no longer be shown.</FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </CardContent>
+        </Card>
+
+
         <div className="flex justify-end space-x-2">
           <Button type="button" variant="outline" onClick={() => router.back()} disabled={isSubmitting}>
             Cancel
           </Button>
           <Button type="submit" disabled={isSubmitting}>
-            {isSubmitting && !navigator.geolocation ? <Icons.spinner className="mr-2 h-4 w-4 animate-spin" /> : null}
+            {isSubmitting ? <Icons.spinner className="mr-2 h-4 w-4 animate-spin" /> : null}
             {mode === "add" ? "Add Club" : "Save Changes"}
           </Button>
         </div>

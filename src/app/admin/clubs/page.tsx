@@ -1,5 +1,5 @@
 
-"use client"; // This page now needs to be a client component to manage state and effects for real-time data
+"use client"; 
 
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -17,18 +17,18 @@ function ClubsDataTableSkeleton() {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <Skeleton className="h-10 w-64" /> {/* Input placeholder */}
-        <Skeleton className="h-10 w-32" /> {/* Columns button placeholder */}
+        <Skeleton className="h-10 w-64" /> 
+        <Skeleton className="h-10 w-32" /> 
       </div>
       <div className="rounded-md border">
-        <Skeleton className="h-12 w-full" /> {/* Table header */}
+        <Skeleton className="h-12 w-full" /> 
         {[...Array(5)].map((_, i) => (
-          <Skeleton key={i} className="h-16 w-full border-t" /> /* Table row placeholder */
+          <Skeleton key={i} className="h-16 w-full border-t" /> 
         ))}
       </div>
       <div className="flex items-center justify-end space-x-2 py-4">
-        <Skeleton className="h-8 w-24" /> {/* Pagination placeholder */}
-        <Skeleton className="h-8 w-24" /> {/* Pagination placeholder */}
+        <Skeleton className="h-8 w-24" /> 
+        <Skeleton className="h-8 w-24" /> 
       </div>
     </div>
   );
@@ -43,7 +43,6 @@ export default function AdminClubsPage() {
     if (!firestore) {
       console.error("Firestore is not initialized. Cannot fetch clubs for admin. This usually means your Firebase environment variables are missing or incorrect.");
       setLoading(false);
-      // Potentially show an error message to the user or set clubs to an empty array with an error flag.
       return;
     }
 
@@ -53,6 +52,11 @@ export default function AdminClubsPage() {
     const unsubscribe = onSnapshot(q, (querySnapshot) => {
       const clubList = querySnapshot.docs.map(doc => {
         const data = doc.data();
+        // Ensure announcementExpiresAt is correctly handled (Date or null)
+        let announcementExpiresAt = null;
+        if (data.announcementExpiresAt) {
+            announcementExpiresAt = data.announcementExpiresAt instanceof Timestamp ? data.announcementExpiresAt.toDate() : new Date(data.announcementExpiresAt);
+        }
         return {
           id: doc.id,
           name: data.name || "Unnamed Club",
@@ -62,6 +66,12 @@ export default function AdminClubsPage() {
           capacityThresholds: data.capacityThresholds || { low: 50, moderate: 100, packed: 150 },
           lastUpdated: data.lastUpdated instanceof Timestamp ? data.lastUpdated.toDate().toISOString() : new Date().toISOString(),
           imageUrl: data.imageUrl,
+          estimatedWaitTime: data.estimatedWaitTime,
+          tags: data.tags || [],
+          musicGenres: data.musicGenres || [],
+          tonightDJ: data.tonightDJ,
+          announcementMessage: data.announcementMessage,
+          announcementExpiresAt: announcementExpiresAt,
         } as ClubWithId;
       });
       setClubs(clubList);
@@ -69,16 +79,12 @@ export default function AdminClubsPage() {
     }, (error) => {
       console.error("Error fetching clubs with real-time listener:", error);
       setLoading(false);
-      // Handle error state, maybe show a toast or error message
     });
 
-    return () => unsubscribe(); // Cleanup listener on component unmount
+    return () => unsubscribe(); 
   }, []);
 
   const refreshData = () => {
-    // With onSnapshot, data refreshes automatically. 
-    // This function can be kept for manual trigger or removed if not needed.
-    // For now, let's make it a no-op or log.
     console.log("Data is real-time, manual refresh typically not needed.");
   };
 
@@ -104,5 +110,3 @@ export default function AdminClubsPage() {
     </div>
   );
 }
-
-// export const revalidate = 0; // No longer needed as page is client-side with real-time data
