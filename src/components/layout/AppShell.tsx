@@ -23,6 +23,8 @@ import { auth } from "@/lib/firebase";
 import { signOut } from "firebase/auth";
 import { useToast } from "@/hooks/use-toast";
 
+const ADMIN_EMAIL = "lgubevu@gmail.com";
+
 interface AppShellProps {
   children: React.ReactNode;
 }
@@ -50,15 +52,18 @@ export default function AppShell({ children }: AppShellProps) {
   };
 
   const mainNavItems = siteConfig.mainNav.filter(item => {
-    if (item.href === "/") return true;
+    if (item.href === "/") return true; // Home link (landing page)
 
-    if (item.href === "/dashboard" || item.href === "/admin/clubs") {
-      return !!user;
+    if (item.href === "/admin/clubs") { // Manage Clubs link
+      return user && user.email === ADMIN_EMAIL;
     }
-    if (item.href === "/auth") {
-        return !user;
+    if (item.href === "/dashboard") { // Dashboard link
+      return !!user; // Any authenticated user
     }
-    return true;
+    if (item.href === "/auth") { // Sign In link
+        return !user; // Only if not logged in
+    }
+    return true; // Should not be reached with current config, but as a fallback
   });
 
   const showFullAppLayout = pathname !== "/" && pathname !== "/auth";
@@ -71,7 +76,6 @@ export default function AppShell({ children }: AppShellProps) {
     );
   }
 
-  // Original complex structure restored
   return (
       <div className="flex min-h-screen bg-background">
         <Sidebar
@@ -92,10 +96,9 @@ export default function AppShell({ children }: AppShellProps) {
           <SidebarContent className="p-2 flex-grow">
             <SidebarMenu>
               {mainNavItems.map((item) => {
-                // Condition from original logic: if item is Home (`/`) and user is logged in, don't show in sidebar.
+                // Condition to hide "Home" from sidebar if user is logged in (dashboard is primary)
                 if (item.href && !(item.href === "/" && user) ) {
                   const IconComponent = item.icon ? Icons[item.icon] : null;
-                  // Original isActive logic from commented block
                   const isItemActive = (pathname === item.href) ||
                                      (item.href !== "/" && item.href !== "/dashboard" && pathname.startsWith(item.href)) ||
                                      (item.href === "/dashboard" && pathname === "/dashboard");

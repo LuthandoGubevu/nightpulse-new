@@ -1,0 +1,31 @@
+
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Clubs collection:
+    // - Any authenticated user can read club data (for dashboard, map, etc.).
+    // - Only the specific admin email can create, update, or delete clubs.
+    match /clubs/{clubId} {
+      allow read: if request.auth != null;
+      allow create, update, delete: if request.auth != null && request.auth.token.email == 'lgubevu@gmail.com';
+    }
+
+    // Visits collection:
+    // - Server actions (like getHistoricalDataForClub used by the AI flow) will be subject
+    //   to these rules if they use the client SDK under the calling user's authentication context.
+    // - Allow any authenticated user to read visit data. This is necessary for the AI flow.
+    // - Writes to visits are assumed to be handled by trusted server-side logic or
+    //   a secure client (e.g., mobile app performing geofenced check-ins) and not directly by general web users.
+    match /visits/{visitId} {
+      allow read: if request.auth != null;
+      // allow write: if <conditions_for_trusted_writes>; // Example: if request.auth.uid == resource.data.userId && <other_validations>
+                                                       // Or, if an admin/service role is writing.
+                                                       // For now, no general client write rule.
+    }
+
+    // By default, if no rule above matches a path, access is denied.
+    // This means any other collections or paths not explicitly allowed are protected.
+  }
+}
