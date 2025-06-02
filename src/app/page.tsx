@@ -10,8 +10,15 @@ export default function LandingPage() {
   return (
     <div className="flex flex-col min-h-screen bg-background text-foreground">
       {/* Hero Section */}
-      <section className="relative py-20 md:py-32 text-center bg-gradient-to-br from-primary via-purple-700 to-purple-900 text-primary-foreground">
+      <section
+        className="relative py-20 md:py-32 text-center text-primary-foreground bg-cover bg-center bg-no-repeat"
+        style={{ backgroundImage: "url('/hero-image.jpg')" }}
+      >
+        {/* Color background overlay with 50% opacity */}
+        <div className="absolute inset-0 bg-gradient-to-br from-primary via-purple-700 to-purple-900 opacity-50"></div>
+        {/* Original darkening and blur overlay */}
         <div className="absolute inset-0 bg-black/30 backdrop-blur-sm"></div>
+        
         <div className="container relative z-10">
           <h1 className="text-5xl md:text-7xl font-bold font-headline mb-6 animate-fade-in-down">
             Find the Pulse of the Night
