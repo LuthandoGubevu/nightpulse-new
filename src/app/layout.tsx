@@ -4,9 +4,9 @@ import { Inter, Space_Grotesk } from 'next/font/google';
 import './globals.css';
 import { cn } from "@/lib/utils";
 import { Toaster } from "@/components/ui/toaster";
-import SiteHeader from '@/components/nav/SiteHeader';
 import { ThemeProvider } from '@/components/theme-provider';
 import { siteConfig } from '@/config/site';
+import AppShell from '@/components/layout/AppShell'; // New import
 
 const fontInter = Inter({
   subsets: ['latin'],
@@ -66,10 +66,7 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          <div className="relative flex min-h-screen flex-col">
-            <SiteHeader />
-            <main className="flex-1">{children}</main>
-          </div>
+          <AppShell>{children}</AppShell>
           <Toaster />
         </ThemeProvider>
       </body>
