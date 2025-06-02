@@ -1,7 +1,7 @@
 
 "use client";
 
-import React from "react"; // Ensure React is directly imported
+import React from "react";
 import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
 import {
@@ -52,18 +52,19 @@ export default function AppShell({ children }: AppShellProps) {
   };
 
   const mainNavItems = siteConfig.mainNav.filter(item => {
-    if (item.href === "/") return true; // Home link (landing page)
+    if (item.href === "/") return true; 
 
-    if (item.href === "/admin/clubs") { // Manage Clubs link
+    if (item.href === "/admin/clubs" || item.href === "/admin/analytics") { 
       return user && user.email === ADMIN_EMAIL;
     }
-    if (item.href === "/dashboard") { // Dashboard link
-      return !!user; // Any authenticated user
+    if (item.href === "/dashboard") { 
+      return !!user; 
     }
-    if (item.href === "/auth") { // Sign In link
-        return !user; // Only if not logged in
+    if (item.href === "/auth") { 
+        return !user; 
     }
-    return true; // Should not be reached with current config, but as a fallback
+    // Default to true for items not explicitly covered, though current config should be exhaustive
+    return true; 
   });
 
   const showFullAppLayout = pathname !== "/" && pathname !== "/auth";
@@ -96,12 +97,16 @@ export default function AppShell({ children }: AppShellProps) {
           <SidebarContent className="p-2 flex-grow">
             <SidebarMenu>
               {mainNavItems.map((item) => {
-                // Condition to hide "Home" from sidebar if user is logged in (dashboard is primary)
                 if (item.href && !(item.href === "/" && user) ) {
                   const IconComponent = item.icon ? Icons[item.icon] : null;
-                  const isItemActive = (pathname === item.href) ||
-                                     (item.href !== "/" && item.href !== "/dashboard" && pathname.startsWith(item.href)) ||
+                  // Enhanced active state check for nested admin routes
+                  const isItemActive = pathname === item.href || 
+                                     (item.href?.startsWith("/admin") && pathname.startsWith(item.href)) ||
                                      (item.href === "/dashboard" && pathname === "/dashboard");
+
+                  // Special handling for /admin/analytics to highlight parent "/admin/clubs" if that's how the nav is structured conceptually
+                  // For now, direct match or prefix match for /admin routes is fine.
+                  
                   return (
                     <SidebarMenuItem key={item.title}>
                       <SidebarMenuButton

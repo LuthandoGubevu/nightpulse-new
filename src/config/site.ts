@@ -11,17 +11,22 @@ export const siteConfig = {
     {
       title: "Home",
       href: "/", 
-      icon: "logo" as keyof typeof Icons, // Or a more generic home icon like 'home' if added
+      icon: "logo" as keyof typeof Icons, 
     },
     {
       title: "Dashboard",
       href: "/dashboard",
-      icon: "barChart" as keyof typeof Icons, // Example icon
+      icon: "layoutDashboard" as keyof typeof Icons, 
     },
     {
       title: "Manage Clubs",
       href: "/admin/clubs",
-      icon: "building" as keyof typeof Icons, // Example icon
+      icon: "building" as keyof typeof Icons, 
+    },
+    {
+      title: "Analytics",
+      href: "/admin/analytics",
+      icon: "barChartBig" as keyof typeof Icons,
     },
     // Example for auth link (conditionally shown by AppShell)
     // {

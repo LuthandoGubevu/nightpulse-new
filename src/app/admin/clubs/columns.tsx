@@ -1,3 +1,4 @@
+
 "use client";
 
 import type { ColumnDef } from "@tanstack/react-table";
@@ -10,6 +11,8 @@ import type { ClubWithId } from "@/types";
 import { ClubStatusIndicator } from "@/components/clubs/ClubStatusIndicator";
 import { getClubStatus, formatDate } from "@/lib/utils";
 import { DeleteClubDialog } from "@/components/admin/DeleteClubDialog";
+import { useToast } from "@/hooks/use-toast";
+import { sendPackedNotificationAction } from "@/actions/adminActions"; // Assuming you create this
 
 export const columns: ColumnDef<ClubWithId>[] = [
   {
@@ -75,6 +78,17 @@ export const columns: ColumnDef<ClubWithId>[] = [
     cell: ({ row, table }) => {
       const club = row.original;
       const meta = table.options.meta as { refreshData?: () => void } | undefined;
+      const { toast } = useToast();
+
+      const handleSendNotification = async () => {
+        toast({ title: "Sending Notification...", description: `Preparing to notify for ${club.name}.` });
+        const result = await sendPackedNotificationAction(club.id);
+        if (result.success) {
+          toast({ title: "Notification Sent (Placeholder)", description: result.message });
+        } else {
+          toast({ title: "Notification Failed", description: result.error, variant: "destructive" });
+        }
+      };
 
       return (
         <DeleteClubDialog 
@@ -97,11 +111,17 @@ export const columns: ColumnDef<ClubWithId>[] = [
                   </Link>
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => navigator.clipboard.writeText(club.id)}>
-                Copy ID
+                  <Icons.keyRound className="mr-2 h-4 w-4" /> Copy ID
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={handleSendNotification}>
+                  <Icons.bellRing className="mr-2 h-4 w-4" /> Notify Packed (Placeholder)
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 {/* Trigger for DeleteClubDialog is the DropdownMenuItem itself */}
-                <DropdownMenuItem className="text-destructive focus:bg-destructive/10 focus:text-destructive">
+                <DropdownMenuItem 
+                  className="text-destructive focus:bg-destructive/10 focus:text-destructive"
+                  // onClick is handled by DeleteClubDialog trigger
+                >
                      <Icons.trash className="mr-2 h-4 w-4" /> Delete
                 </DropdownMenuItem>
             </DropdownMenuContent>

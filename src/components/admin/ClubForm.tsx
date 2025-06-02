@@ -24,6 +24,7 @@ import { Icons } from "@/components/icons";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { useState, useEffect } from "react";
 import { APIProvider, Map, AdvancedMarker } from '@vis.gl/react-google-maps';
+import type { AdvancedMarkerDragEvent } from '@vis.gl/react-google-maps';
 import { mapConfig } from '@/config';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
@@ -89,55 +90,68 @@ export function ClubForm({ club, mode }: ClubFormProps) {
   });
 
   const [mapApiKeyError, setMapApiKeyError] = useState<string | null>(null);
-  const [markerPosition, setMarkerPosition] = useState<{ lat: number; lng: number } | null>(() => {
-    const lat = defaultValues.latitude;
-    const lng = defaultValues.longitude;
+  
+  const getInitialMarkerPosition = () => {
+    const lat = form.getValues('latitude');
+    const lng = form.getValues('longitude');
     if (typeof lat === 'number' && typeof lng === 'number' && !isNaN(lat) && !isNaN(lng)) {
       return { lat, lng };
     }
     return null;
-  });
+  };
+  const [markerPosition, setMarkerPosition] = useState<{ lat: number; lng: number } | null>(getInitialMarkerPosition());
 
-  const [mapCenter, setMapCenter] = useState<{ lat: number; lng: number }>(() => {
-    const lat = defaultValues.latitude;
-    const lng = defaultValues.longitude;
+  const getInitialMapCenter = () => {
+    const lat = form.getValues('latitude');
+    const lng = form.getValues('longitude');
     if (typeof lat === 'number' && typeof lng === 'number' && !isNaN(lat) && !isNaN(lng)) {
       return { lat, lng };
     }
     return mapConfig.defaultCenter;
-  });
+  };
+  const [mapCenter, setMapCenter] = useState<{ lat: number; lng: number }>(getInitialMapCenter());
 
   useEffect(() => {
     if (!mapConfig.apiKey) {
       setMapApiKeyError("Google Maps API Key is not configured. Map functionality will be disabled.");
     }
   }, []);
-
+  
   useEffect(() => {
-    const watchedLat = form.watch('latitude');
-    const watchedLng = form.watch('longitude');
-    if (typeof watchedLat === 'number' && typeof watchedLng === 'number' && !isNaN(watchedLat) && !isNaN(watchedLng)) {
-      const newPos = { lat: watchedLat, lng: watchedLng };
-      if (!markerPosition || markerPosition.lat !== newPos.lat || markerPosition.lng !== newPos.lng) {
-        setMarkerPosition(newPos);
+    const subscription = form.watch((value, { name }) => {
+      if (name === 'latitude' || name === 'longitude') {
+        const lat = value.latitude;
+        const lng = value.longitude;
+        if (typeof lat === 'number' && typeof lng === 'number' && !isNaN(lat) && !isNaN(lng)) {
+          const newPos = { lat, lng };
+          setMarkerPosition(newPos);
+          setMapCenter(newPos); // Also update map center when coords change
+        } else {
+          setMarkerPosition(null);
+        }
       }
-      if (mapCenter.lat !== newPos.lat || mapCenter.lng !== newPos.lng) {
-        setMapCenter(newPos);
-      }
-    } else if (markerPosition !== null) {
-      setMarkerPosition(null);
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [form.watch('latitude'), form.watch('longitude')]);
+    });
+    return () => subscription.unsubscribe();
+  }, [form.watch]);
 
 
   const handleMapClick = (event: google.maps.MapMouseEvent) => {
     if (event.detail.latLng) {
       const lat = parseFloat(event.detail.latLng.lat.toFixed(6));
       const lng = parseFloat(event.detail.latLng.lng.toFixed(6));
-      form.setValue("latitude", lat, { shouldValidate: true });
-      form.setValue("longitude", lng, { shouldValidate: true });
-      // No need to call setMarkerPosition here, useEffect will handle it
+      form.setValue("latitude", lat, { shouldValidate: true, shouldDirty: true });
+      form.setValue("longitude", lng, { shouldValidate: true, shouldDirty: true });
+      // useEffect will update markerPosition and mapCenter
+    }
+  };
+
+  const handleMarkerDragEnd = (event: AdvancedMarkerDragEvent) => {
+    if (event.marker.position) {
+        const lat = parseFloat(event.marker.position.lat.toFixed(6));
+        const lng = parseFloat(event.marker.position.lng.toFixed(6));
+        form.setValue("latitude", lat, { shouldValidate: true, shouldDirty: true });
+        form.setValue("longitude", lng, { shouldValidate: true, shouldDirty: true });
+        // useEffect will update markerPosition and mapCenter
     }
   };
 
@@ -148,9 +162,8 @@ export function ClubForm({ club, mode }: ClubFormProps) {
         (position) => {
           const lat = parseFloat(position.coords.latitude.toFixed(6));
           const lng = parseFloat(position.coords.longitude.toFixed(6));
-          form.setValue("latitude", lat, { shouldValidate: true });
-          form.setValue("longitude", lng, { shouldValidate: true });
-          // setMapCenter({ lat, lng }); // useEffect will also handle this
+          form.setValue("latitude", lat, { shouldValidate: true, shouldDirty: true });
+          form.setValue("longitude", lng, { shouldValidate: true, shouldDirty: true });
           toast({ title: "Location Updated", description: "Current location fetched successfully." });
           setIsSubmitting(false);
         },
@@ -159,7 +172,7 @@ export function ClubForm({ club, mode }: ClubFormProps) {
           toast({ title: "Location Error", description: `Could not fetch current location: ${error.message}`, variant: "destructive" });
           setIsSubmitting(false);
         },
-        { timeout: 10000 } // Add a timeout for geolocation
+        { timeout: 10000 } 
       );
     } else {
       toast({ title: "Location Error", description: "Geolocation is not supported by this browser.", variant: "destructive" });
@@ -171,15 +184,10 @@ export function ClubForm({ club, mode }: ClubFormProps) {
     setIsSubmitting(true);
     const formData = new FormData();
     
-    // Convert ClubFormValues to FormData, ensuring nullable fields are handled
     (Object.keys(data) as Array<keyof ClubFormValues>).forEach((key) => {
         const value = data[key];
         if (value !== undefined && value !== null) {
             formData.append(key, String(value));
-        } else if (key === 'latitude' || key === 'longitude') {
-            // Explicitly do not append if null, actions/schema should handle missing optional fields
-            // Or, if your action expects empty strings for nulls:
-            // formData.append(key, ''); 
         }
     });
     
@@ -267,7 +275,7 @@ export function ClubForm({ club, mode }: ClubFormProps) {
           <CardHeader>
             <CardTitle>Location</CardTitle>
             <CardDescription>
-              Set coordinates by clicking the map, entering manually, or using current location.
+              Click map, drag pin, enter manually, or use current location.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -321,10 +329,17 @@ export function ClubForm({ club, mode }: ClubFormProps) {
                     gestureHandling={'greedy'}
                     disableDefaultUI={true}
                     onClick={handleMapClick}
-                    mapId="club-form-map-123" // Ensure unique mapId
+                    mapId="club-form-map-draggable" 
                     className="h-full w-full"
                   >
-                    {markerPosition && <AdvancedMarker position={markerPosition} title="Selected Location" />}
+                    {markerPosition && (
+                        <AdvancedMarker 
+                            position={markerPosition} 
+                            title="Selected Location" 
+                            draggable={true}
+                            onDragEnd={handleMarkerDragEnd}
+                        />
+                    )}
                   </Map>
                 </APIProvider>
               </div>
@@ -356,7 +371,7 @@ export function ClubForm({ club, mode }: ClubFormProps) {
                   <FormControl>
                     <Input type="number" {...field} onChange={e => field.onChange(parseInt(e.target.value, 10) || 0)} />
                   </FormControl>
-                  <FormDescription>This value is typically updated by the mobile app.</FormDescription>
+                  <FormDescription>This value can be manually overridden here or updated by other mechanisms.</FormDescription>
                   <FormMessage />
                 </FormItem>
               )}
@@ -421,6 +436,3 @@ export function ClubForm({ club, mode }: ClubFormProps) {
     </Form>
   );
 }
-
-
-    

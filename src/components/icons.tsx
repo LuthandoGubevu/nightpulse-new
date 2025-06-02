@@ -31,14 +31,18 @@ import {
   Instagram,
   Linkedin,
   Download,
-  BarChart,
+  BarChartBig, // Changed from BarChart
   Navigation,
   LogIn,
   LogOut,
   UserPlus,
   Mail,
   KeyRound,
-  Image as LucideImage, // For placeholder, or can use building if more appropriate
+  Image as LucideImage,
+  BellRing, // Added for notifications
+  TrendingUp, // Added for trends
+  UsersRound, // Alternative for Users, if needed
+  LayoutDashboard, // Added for dashboard icon
 } from "lucide-react"
 
 // A simple Google icon SVG as lucide-react doesn't have one directly
@@ -68,7 +72,7 @@ export const Icons = {
   moreHorizontal: MoreHorizontal,
   arrowUpDown: ArrowUpDown,
   view: Eye,
-  martini: Martini, // Also used as logo in landing page CTA
+  martini: Martini, 
   building: Building,
   logo: Martini, 
   spinner: Loader2,
@@ -86,7 +90,7 @@ export const Icons = {
   instagram: Instagram,
   linkedin: Linkedin,
   download: Download,
-  barChart: BarChart,
+  barChartBig: BarChartBig, // Updated
   navigation: Navigation,
   logIn: LogIn,
   logOut: LogOut,
@@ -95,4 +99,8 @@ export const Icons = {
   keyRound: KeyRound,
   google: GoogleIcon,
   image: LucideImage,
+  bellRing: BellRing,
+  trendingUp: TrendingUp,
+  usersRound: UsersRound,
+  layoutDashboard: LayoutDashboard,
 }
