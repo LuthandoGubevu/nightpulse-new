@@ -34,7 +34,8 @@ export interface ClubWithId extends Club {
 }
 
 export interface Visit {
-  deviceId: string; // Hashed
+  userId: string; // Firebase Auth UID of the user who made the visit
+  deviceId: string; // Hashed device ID, potentially for geofencing or more granular device tracking
   clubId: string;
   entryTimestamp: Timestamp | Date | string;
   exitTimestamp?: Timestamp | Date | string | null;
@@ -51,3 +52,11 @@ export interface UserLocation {
   lat: number;
   lng: number;
 }
+
+// Optional: Define a type for user profiles if you plan to use the /users/{userId} collection
+// export interface UserProfile {
+//   id: string; // Should match Firebase Auth UID
+//   displayName?: string;
+//   email?: string; // Usually from Auth, but can be stored for convenience
+//   // Add other app-specific user fields here
+// }
