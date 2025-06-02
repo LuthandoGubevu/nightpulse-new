@@ -71,12 +71,8 @@ export default function AppShell({ children }: AppShellProps) {
     );
   }
 
-  // Drastically simplified return for diagnostic purposes
+  // Original complex structure restored
   return (
-    <div>Simplified Test Content. If you see this, the basic JSX parsing worked. The issue is in the complex AppShell structure. {children} </div>
-  );
-
-  /* Original complex structure that was causing issues:
       <div className="flex min-h-screen bg-background">
         <Sidebar
           side="left"
@@ -96,17 +92,23 @@ export default function AppShell({ children }: AppShellProps) {
           <SidebarContent className="p-2 flex-grow">
             <SidebarMenu>
               {mainNavItems.map((item) => {
+                // Condition from original logic: if item is Home (`/`) and user is logged in, don't show in sidebar.
                 if (item.href && !(item.href === "/" && user) ) {
+                  const IconComponent = item.icon ? Icons[item.icon] : null;
+                  // Original isActive logic from commented block
+                  const isItemActive = (pathname === item.href) ||
+                                     (item.href !== "/" && item.href !== "/dashboard" && pathname.startsWith(item.href)) ||
+                                     (item.href === "/dashboard" && pathname === "/dashboard");
                   return (
                     <SidebarMenuItem key={item.title}>
                       <SidebarMenuButton
                         asChild
-                        isActive={pathname === item.href || (item.href !== "/" && item.href !== "/dashboard" && pathname.startsWith(item.href)) || (item.href === "/dashboard" && pathname === "/dashboard")}
+                        isActive={isItemActive}
                         tooltip={item.title}
                         className="w-full justify-start"
                       >
                         <Link href={item.href}>
-                          {item.icon && <Icons[item.icon] className="h-4 w-4" />}
+                          {IconComponent && <IconComponent className="h-4 w-4" />}
                           <span className="group-data-[collapsible=icon]:hidden">{item.title}</span>
                         </Link>
                       </SidebarMenuButton>
@@ -165,5 +167,5 @@ export default function AppShell({ children }: AppShellProps) {
           </main>
         </SidebarInset>
       </div>
-  */
+  );
 }
