@@ -22,20 +22,26 @@ const getFirebaseConfig = () => ({
 const firebaseConfig = getFirebaseConfig();
 const configProblems: string[] = [];
 
-if (!firebaseConfig.apiKey || firebaseConfig.apiKey === "YOUR_API_KEY") {
-  configProblems.push("NEXT_PUBLIC_FIREBASE_API_KEY is missing or uses a placeholder value.");
-}
-if (!firebaseConfig.authDomain || firebaseConfig.authDomain === "YOUR_AUTH_DOMAIN") {
-  configProblems.push("NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN is missing or uses a placeholder value.");
-}
-if (!firebaseConfig.projectId || firebaseConfig.projectId === "YOUR_PROJECT_ID") {
-  configProblems.push("NEXT_PUBLIC_FIREBASE_PROJECT_ID is missing or uses a placeholder value.");
-}
-// You can add more checks for other critical variables if needed, e.g., appId
+// Define critical keys and their placeholder prefixes for validation
+const criticalConfigMappings: { key: keyof typeof firebaseConfig, placeholderPrefix: string }[] = [
+  { key: 'apiKey', placeholderPrefix: 'YOUR_API_KEY' },
+  { key: 'authDomain', placeholderPrefix: 'YOUR_AUTH_DOMAIN' },
+  { key: 'projectId', placeholderPrefix: 'YOUR_PROJECT_ID' },
+  { key: 'appId', placeholderPrefix: 'YOUR_APP_ID' } // Added appId to critical checks
+];
+
+criticalConfigMappings.forEach(mapping => {
+  const value = firebaseConfig[mapping.key];
+  if (!value || value.trim() === "" || value === mapping.placeholderPrefix) {
+    const envVarName = `NEXT_PUBLIC_FIREBASE_${mapping.key.replace(/([A-Z])/g, '_$1').toUpperCase()}`;
+    configProblems.push(`${envVarName} is missing, empty, or uses a placeholder value.`);
+  }
+});
+
 
 if (configProblems.length > 0) {
   console.warn(
-    "Firebase is not properly configured. The following issues were found with your environment variables (check your .env file):"
+    "🔴 Firebase is not properly configured. The following issues were found with your environment variables (check your .env file):"
   );
   configProblems.forEach(problem => console.warn(`- ${problem}`));
   console.warn(
@@ -50,17 +56,14 @@ if (configProblems.length > 0) {
   // Initialize Firebase only if config seems valid and essential vars are present
   if (!getApps().length) {
     try {
-      // Cast to 'any' for firebaseConfig if some optional properties might be undefined
-      // and your actual config object in Firebase console might not list them all.
-      // However, ensure all REQUIRED fields for initializeApp are present and valid.
       app = initializeApp(firebaseConfig as any);
       auth = getAuth(app);
       firestore = getFirestore(app);
       // if (firebaseConfig.measurementId && firebaseConfig.measurementId !== "YOUR_MEASUREMENT_ID") {
       //   analytics = getAnalytics(app);
       // }
-    } catch (e) {
-      console.error("Firebase initialization failed, even with seemingly valid config:", e);
+    } catch (e: any) {
+      console.error("🔴 Firebase initialization failed unexpectedly, even with seemingly valid config values in .env. Error:", e.message);
       app = undefined;
       auth = undefined;
       firestore = undefined;
@@ -75,6 +78,11 @@ if (configProblems.length > 0) {
     // }
   }
 }
+
+if (!auth) {
+    console.warn("🔴 Firebase Auth service could not be initialized. Check server logs for more specific Firebase configuration errors. Ensure .env variables are correct and the dev server was restarted after changes.");
+}
+
 
 export { app, auth, firestore };
 
