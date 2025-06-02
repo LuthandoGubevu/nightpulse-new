@@ -63,26 +63,6 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* Live Preview/Heatmap Screenshot Section */}
-      <section className="py-16 md:py-24 bg-card">
-        <div className="container text-center">
-          <h2 className="text-3xl md:text-4xl font-bold font-headline mb-8">See It In Action</h2>
-          <p className="text-lg text-muted-foreground mb-8 max-w-2xl mx-auto">
-            Imagine knowing the vibe of every club before you even step out. NightPulse gives you that power.
-          </p>
-          <div className="rounded-lg overflow-hidden shadow-2xl">
-            <Image
-              src="https://placehold.co/1200x600.png"
-              alt="NightPulse App Screenshot or Heatmap"
-              width={1200}
-              height={600}
-              className="w-full h-auto object-cover"
-              data-ai-hint="app interface heatmap"
-            />
-          </div>
-        </div>
-      </section>
-
       {/* Benefits Section */}
       <section className="py-16 md:py-24 bg-background">
         <div className="container">
