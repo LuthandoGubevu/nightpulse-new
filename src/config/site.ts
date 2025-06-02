@@ -1,13 +1,18 @@
+
 export type SiteConfig = typeof siteConfig
 
 export const siteConfig = {
-  name: "Nightlife Navigator",
+  name: "NightPulse",
   description:
     "Navigate the night with real-time club crowd data and estimated wait times.",
   mainNav: [
     {
+      title: "Home",
+      href: "/", // Landing page
+    },
+    {
       title: "Dashboard",
-      href: "/",
+      href: "/dashboard", // User dashboard
     },
     {
       title: "Manage Clubs",

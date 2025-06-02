@@ -1,3 +1,4 @@
+
 import type {Metadata, Viewport} from 'next';
 import { Inter, Space_Grotesk } from 'next/font/google';
 import './globals.css';
@@ -5,6 +6,7 @@ import { cn } from "@/lib/utils";
 import { Toaster } from "@/components/ui/toaster";
 import SiteHeader from '@/components/nav/SiteHeader';
 import { ThemeProvider } from '@/components/theme-provider';
+import { siteConfig } from '@/config/site';
 
 const fontInter = Inter({
   subsets: ['latin'],
@@ -17,8 +19,18 @@ const fontSpaceGrotesk = Space_Grotesk({
 });
 
 export const metadata: Metadata = {
-  title: 'Nightlife Navigator',
-  description: 'Navigate the night with real-time club crowd data.',
+  title: {
+    default: siteConfig.name,
+    template: `%s | ${siteConfig.name}`,
+  },
+  description: siteConfig.description,
+  // TODO: Add icons and manifest if this were a PWA or for better browser tab visuals
+  // icons: {
+  //   icon: "/favicon.ico",
+  //   shortcut: "/favicon-16x16.png",
+  //   apple: "/apple-touch-icon.png",
+  // },
+  // manifest: `/site.webmanifest`,
 };
 
 export const viewport: Viewport = {

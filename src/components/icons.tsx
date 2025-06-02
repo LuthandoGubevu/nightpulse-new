@@ -1,3 +1,4 @@
+
 import {
   Moon,
   SunMedium,
@@ -20,6 +21,18 @@ import {
   Search,
   X,
   AlertTriangle,
+  Smartphone,
+  Activity,
+  PartyPopper,
+  CheckCircle2,
+  ShieldCheck,
+  Facebook,
+  Twitter,
+  Instagram,
+  Linkedin,
+  Download,
+  BarChart,
+  Navigation,
 } from "lucide-react"
 
 export type Icon = LucideIcon
@@ -38,12 +51,24 @@ export const Icons = {
   moreHorizontal: MoreHorizontal,
   arrowUpDown: ArrowUpDown,
   view: Eye,
-  martini: Martini,
+  martini: Martini, // Also used as logo in landing page CTA
   building: Building,
-  logo: Martini, // Example logo
+  logo: Martini, 
   spinner: Loader2,
   externalLink: ExternalLink,
   search: Search,
   close: X,
   warning: AlertTriangle,
+  smartphone: Smartphone,
+  activity: Activity,
+  partyPopper: PartyPopper,
+  checkCircle2: CheckCircle2,
+  shieldCheck: ShieldCheck,
+  facebook: Facebook,
+  twitter: Twitter,
+  instagram: Instagram,
+  linkedin: Linkedin,
+  download: Download,
+  barChart: BarChart,
+  navigation: Navigation,
 }
