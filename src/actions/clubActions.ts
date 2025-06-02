@@ -67,7 +67,11 @@ export async function addClubAction(formData: FormData) {
 
   if (!validation.success) {
     console.error("Validation errors:", validation.error.flatten().fieldErrors);
-    return { success: false, error: "Validation failed", errors: validation.error.flatten().fieldErrors };
+    return { 
+      success: false, 
+      error: "Validation failed. Please check the form fields.", 
+      errors: validation.error.flatten().fieldErrors 
+    };
   }
   
   const clubDataValidated = validation.data;
@@ -94,9 +98,12 @@ export async function addClubAction(formData: FormData) {
     revalidatePath("/admin/clubs");
     revalidatePath("/"); // For user dashboard
     return { success: true };
-  } catch (error) {
-    console.error("Error adding club:", error);
-    return { success: false, error: "Failed to add club." };
+  } catch (error: any) {
+    console.error("Error adding club to Firestore:", error);
+    return { 
+      success: false, 
+      error: error.message || "Failed to add club. Check server logs for details." 
+    };
   }
 }
 
@@ -133,7 +140,11 @@ export async function updateClubAction(clubId: string, formData: FormData) {
 
   if (!validation.success) {
     console.error("Validation errors:", validation.error.flatten().fieldErrors);
-    return { success: false, error: "Validation failed", errors: validation.error.flatten().fieldErrors };
+    return { 
+      success: false, 
+      error: "Validation failed. Please check the form fields.", 
+      errors: validation.error.flatten().fieldErrors 
+    };
   }
 
   const clubDataValidated = validation.data;
@@ -162,9 +173,12 @@ export async function updateClubAction(clubId: string, formData: FormData) {
     revalidatePath(`/admin/clubs/edit/${clubId}`);
     revalidatePath("/"); // For user dashboard
     return { success: true };
-  } catch (error) {
-    console.error("Error updating club:", error);
-    return { success: false, error: "Failed to update club." };
+  } catch (error: any) {
+    console.error("Error updating club in Firestore:", error);
+    return { 
+      success: false, 
+      error: error.message || "Failed to update club. Check server logs for details." 
+    };
   }
 }
 
@@ -175,9 +189,12 @@ export async function deleteClubAction(clubId: string) {
     revalidatePath("/admin/clubs");
     revalidatePath("/");
     return { success: true };
-  } catch (error) {
-    console.error("Error deleting club:", error);
-    return { success: false, error: "Failed to delete club." };
+  } catch (error: any) {
+    console.error("Error deleting club from Firestore:", error);
+    return { 
+      success: false, 
+      error: error.message || "Failed to delete club. Check server logs for details." 
+    };
   }
 }
 

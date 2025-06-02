@@ -175,7 +175,6 @@ export function ClubForm({ club, mode }: ClubFormProps) {
   };
 
   const handleMarkerDragEnd = (event: AdvancedMarkerDragEvent) => {
-    // Defensive check for event, event.marker, and event.marker.position
     if (!event || !event.marker || !event.marker.position) {
       console.warn("Marker drag end event is missing 'event', 'marker', or 'marker.position'. Event:", event);
       return;
@@ -185,13 +184,11 @@ export function ClubForm({ club, mode }: ClubFormProps) {
     let latValue: number | undefined;
     let lngValue: number | undefined;
 
-    // Check if position is a google.maps.LatLng object (has lat() and lng() methods)
     if (typeof (position as google.maps.LatLng).lat === 'function' && 
         typeof (position as google.maps.LatLng).lng === 'function') {
       latValue = (position as google.maps.LatLng).lat();
       lngValue = (position as google.maps.LatLng).lng();
     } 
-    // Check if position is a google.maps.LatLngLiteral (has lat and lng properties as numbers)
     else if (typeof (position as google.maps.LatLngLiteral).lat === 'number' && 
              typeof (position as google.maps.LatLngLiteral).lng === 'number') {
       latValue = (position as google.maps.LatLngLiteral).lat;
@@ -262,12 +259,15 @@ export function ClubForm({ club, mode }: ClubFormProps) {
     } else {
       toast({
         title: `Error ${mode === "edit" ? "Updating" : "Adding"} Club`,
-        description: result.error || "An unexpected error occurred.",
+        description: result.error || "An unexpected error occurred. Check server logs.",
         variant: "destructive",
       });
       if (result.errors) {
-        Object.entries(result.errors).forEach(([field, errors]) => {
-          form.setError(field as keyof ClubFormValues, { message: (errors as string[]).join(", ") });
+        (Object.keys(result.errors) as Array<keyof ClubFormValues>).forEach((field) => {
+            const fieldErrors = result.errors?.[field];
+            if (fieldErrors) {
+                 form.setError(field, { message: fieldErrors.join(", ") });
+            }
         });
       }
     }
@@ -573,4 +573,3 @@ export function ClubForm({ club, mode }: ClubFormProps) {
     </Form>
   );
 }
-
