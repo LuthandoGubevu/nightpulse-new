@@ -1,7 +1,7 @@
 
 "use client"; // Needs to be client component for auth check and redirect
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { collection, getDocs, orderBy, query, Timestamp } from "firebase/firestore";
 import { firestore } from "@/lib/firebase";
@@ -13,6 +13,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Icons } from "@/components/icons";
 import { useAuth } from "@/hooks/useAuth"; // Import useAuth hook
 import { Skeleton } from "@/components/ui/skeleton";
+import { Card, CardContent, CardFooter } from "@/components/ui/card";
 
 // This function can remain outside the component as it's a utility for data fetching
 async function getClubsServerSide(): Promise<ClubWithId[]> {
