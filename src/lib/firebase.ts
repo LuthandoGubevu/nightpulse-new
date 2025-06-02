@@ -27,14 +27,14 @@ const criticalConfigMappings: { key: keyof typeof firebaseConfig, placeholderPre
   { key: 'apiKey', placeholderPrefix: 'YOUR_API_KEY' },
   { key: 'authDomain', placeholderPrefix: 'YOUR_AUTH_DOMAIN' },
   { key: 'projectId', placeholderPrefix: 'YOUR_PROJECT_ID' },
-  { key: 'appId', placeholderPrefix: 'YOUR_APP_ID' } // Added appId to critical checks
+  { key: 'appId', placeholderPrefix: 'YOUR_APP_ID' } 
 ];
 
 criticalConfigMappings.forEach(mapping => {
   const value = firebaseConfig[mapping.key];
-  if (!value || value.trim() === "" || value === mapping.placeholderPrefix) {
-    const envVarName = `NEXT_PUBLIC_FIREBASE_${mapping.key.replace(/([A-Z])/g, '_$1').toUpperCase()}`;
-    configProblems.push(`${envVarName} is missing, empty, or uses a placeholder value.`);
+  const envVarName = `NEXT_PUBLIC_FIREBASE_${mapping.key.replace(/([A-Z])/g, '_$1').toUpperCase()}`;
+  if (!value || String(value).trim() === "" || String(value).startsWith(mapping.placeholderPrefix.substring(0,5))) { // Check for placeholder start
+    configProblems.push(`${envVarName} is missing, empty, or uses a placeholder value (e.g., starts with "YOUR_" or similar).`);
   }
 });
 
@@ -48,17 +48,17 @@ if (configProblems.length > 0) {
     "Please provide your actual Firebase project credentials in the .env file. " +
     "The application will run with limited or no Firebase functionality until configured."
   );
-  // Ensure Firebase services remain undefined
   app = undefined;
   auth = undefined;
   firestore = undefined;
 } else {
-  // Initialize Firebase only if config seems valid and essential vars are present
   if (!getApps().length) {
     try {
+      console.info("Attempting to initialize Firebase app...");
       app = initializeApp(firebaseConfig as any);
       auth = getAuth(app);
       firestore = getFirestore(app);
+      console.info("✅ Firebase app, auth, and firestore services initialized on server.");
       // if (firebaseConfig.measurementId && firebaseConfig.measurementId !== "YOUR_MEASUREMENT_ID") {
       //   analytics = getAnalytics(app);
       // }
@@ -69,18 +69,20 @@ if (configProblems.length > 0) {
       firestore = undefined;
     }
   } else {
-    // Firebase already initialized
     app = getApps()[0]!;
     auth = getAuth(app);
     firestore = getFirestore(app);
+    console.info("✅ Firebase app, auth, and firestore services re-used existing initialization on server.");
     // if (firebaseConfig.measurementId && firebaseConfig.measurementId !== "YOUR_MEASUREMENT_ID" && app) {
     //   analytics = getAnalytics(app);
     // }
   }
 }
 
-if (!auth) {
-    console.warn("🔴 Firebase Auth service could not be initialized. Check server logs for more specific Firebase configuration errors. Ensure .env variables are correct and the dev server was restarted after changes.");
+if (configProblems.length === 0) { // Only perform these checks if initial config seemed okay
+    if (!app) console.error("🔴 Firebase App (app) is undefined on the server, even after initialization attempt.");
+    if (!auth) console.error("🔴 Firebase Auth (auth) is undefined on the server, even after initialization attempt. This will cause client-side errors.");
+    if (!firestore) console.error("🔴 Firebase Firestore (firestore) is undefined on the server, even after initialization attempt.");
 }
 
 
