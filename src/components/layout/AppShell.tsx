@@ -1,7 +1,7 @@
 
 "use client";
 
-import React from "react";
+import React from "react"; // Ensure React is directly imported
 import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
 import {
@@ -71,7 +71,12 @@ export default function AppShell({ children }: AppShellProps) {
     );
   }
 
+  // Drastically simplified return for diagnostic purposes
   return (
+    <div>Simplified Test Content. If you see this, the basic JSX parsing worked. The issue is in the complex AppShell structure. {children} </div>
+  );
+
+  /* Original complex structure that was causing issues:
       <div className="flex min-h-screen bg-background">
         <Sidebar
           side="left"
@@ -108,7 +113,7 @@ export default function AppShell({ children }: AppShellProps) {
                     </SidebarMenuItem>
                   );
                 }
-                return null; 
+                return null;
               })}
             </SidebarMenu>
           </SidebarContent>
@@ -160,5 +165,5 @@ export default function AppShell({ children }: AppShellProps) {
           </main>
         </SidebarInset>
       </div>
-  );
+  */
 }
