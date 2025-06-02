@@ -175,11 +175,34 @@ export function ClubForm({ club, mode }: ClubFormProps) {
   };
 
   const handleMarkerDragEnd = (event: AdvancedMarkerDragEvent) => {
-    if (event.marker.position) {
-        const lat = parseFloat(event.marker.position.lat.toFixed(6));
-        const lng = parseFloat(event.marker.position.lng.toFixed(6));
-        form.setValue("latitude", lat, { shouldValidate: true, shouldDirty: true });
-        form.setValue("longitude", lng, { shouldValidate: true, shouldDirty: true });
+    // Defensive check for event, event.marker, and event.marker.position
+    if (!event || !event.marker || !event.marker.position) {
+      console.warn("Marker drag end event is missing 'event', 'marker', or 'marker.position'. Event:", event);
+      return;
+    }
+
+    const position = event.marker.position;
+    let latValue: number | undefined;
+    let lngValue: number | undefined;
+
+    // Check if position is a google.maps.LatLng object (has lat() and lng() methods)
+    if (typeof (position as google.maps.LatLng).lat === 'function' && 
+        typeof (position as google.maps.LatLng).lng === 'function') {
+      latValue = (position as google.maps.LatLng).lat();
+      lngValue = (position as google.maps.LatLng).lng();
+    } 
+    // Check if position is a google.maps.LatLngLiteral (has lat and lng properties as numbers)
+    else if (typeof (position as google.maps.LatLngLiteral).lat === 'number' && 
+             typeof (position as google.maps.LatLngLiteral).lng === 'number') {
+      latValue = (position as google.maps.LatLngLiteral).lat;
+      lngValue = (position as google.maps.LatLngLiteral).lng;
+    }
+
+    if (typeof latValue === 'number' && typeof lngValue === 'number') {
+      form.setValue("latitude", parseFloat(latValue.toFixed(6)), { shouldValidate: true, shouldDirty: true });
+      form.setValue("longitude", parseFloat(lngValue.toFixed(6)), { shouldValidate: true, shouldDirty: true });
+    } else {
+      console.warn("Marker drag end: position format not recognized or lat/lng are not numbers.", position);
     }
   };
 
@@ -347,7 +370,7 @@ export function ClubForm({ club, mode }: ClubFormProps) {
                   <Icons.warning className="h-4 w-4" />
                   <AlertTitle>Map Display Disabled</AlertTitle>
                   <AlertDescription>
-                      Google Maps API Key is not configured. Please set the <code className="bg-primary/10 text-primary font-mono p-1 rounded-sm text-xs">NEXT_PUBLIC_GOOGLE_MAPS_API_KEY</code> environment variable. Map functionality will be unavailable.
+                      Google Maps API Key is not configured. Please ensure the <code className="bg-primary/10 text-primary font-mono p-1 rounded-sm text-xs">NEXT_PUBLIC_GOOGLE_MAPS_API_KEY</code> environment variable is correctly set in your <code className="bg-primary/10 text-primary font-mono p-1 rounded-sm text-xs">.env</code> file and that your development server has been restarted. Map functionality will be unavailable.
                   </AlertDescription>
                 </Alert>
             )}
