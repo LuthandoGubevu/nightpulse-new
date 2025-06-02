@@ -13,7 +13,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 
 async function getClubs(): Promise<ClubWithId[]> {
   if (!firestore) {
-    console.error("Firestore is not initialized. Cannot fetch clubs for admin.");
+    console.error("Firestore is not initialized. Cannot fetch clubs for admin. This usually means your Firebase environment variables (e.g., NEXT_PUBLIC_FIREBASE_PROJECT_ID) are missing or incorrect in your .env file. Please check your server console for more specific error messages from the Firebase initialization process.");
     return [];
   }
   try {

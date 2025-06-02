@@ -1,3 +1,4 @@
+
 import { collection, getDocs, orderBy, query, Timestamp } from "firebase/firestore";
 import { firestore } from "@/lib/firebase";
 import type { ClubWithId } from "@/types";
@@ -9,7 +10,7 @@ import { Icons } from "@/components/icons";
 
 async function getClubs(): Promise<ClubWithId[]> {
   if (!firestore) {
-    console.error("Firestore is not initialized. Cannot fetch clubs.");
+    console.error("Firestore is not initialized. Cannot fetch clubs. This usually means your Firebase environment variables (e.g., NEXT_PUBLIC_FIREBASE_PROJECT_ID) are missing or incorrect in your .env file. Please check your server console for more specific error messages from the Firebase initialization process.");
     return [];
   }
   try {
