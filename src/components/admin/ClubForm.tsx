@@ -126,8 +126,6 @@ export function ClubForm({ club, mode }: ClubFormProps) {
     defaultValues,
     mode: "onChange",
   });
-
-  const [mapApiKeyError, setMapApiKeyError] = useState<string | null>(null);
   
   const getInitialMarkerPosition = () => {
     const lat = form.getValues('latitude');
@@ -148,12 +146,6 @@ export function ClubForm({ club, mode }: ClubFormProps) {
     return mapConfig.defaultCenter;
   };
   const [mapCenter, setMapCenter] = useState<{ lat: number; lng: number }>(getInitialMapCenter());
-
-  useEffect(() => {
-    if (!mapConfig.apiKey) {
-      setMapApiKeyError("Google Maps API Key is not configured. Map functionality will be disabled.");
-    }
-  }, []);
   
   useEffect(() => {
     const subscription = form.watch((value, { name }) => {
@@ -170,7 +162,7 @@ export function ClubForm({ club, mode }: ClubFormProps) {
       }
     });
     return () => subscription.unsubscribe();
-  }, [form, form.watch]); // Added form to dependency array
+  }, [form]);
 
 
   const handleMapClick = (event: google.maps.MapMouseEvent) => {
@@ -349,16 +341,18 @@ export function ClubForm({ club, mode }: ClubFormProps) {
               {isSubmitting && navigator.geolocation ? <Icons.spinner className="mr-2 h-4 w-4 animate-spin" /> : <Icons.mapPin className="mr-2 h-4 w-4" />}
                Use Current Location
             </Button>
-
-            {mapApiKeyError && (
-              <Alert variant="destructive">
-                <Icons.warning className="h-4 w-4" />
-                <AlertTitle>Map Configuration Error</AlertTitle>
-                <AlertDescription>{mapApiKeyError}</AlertDescription>
-              </Alert>
+            
+            {!mapConfig.apiKey && (
+                <Alert variant="destructive">
+                  <Icons.warning className="h-4 w-4" />
+                  <AlertTitle>Map Display Disabled</AlertTitle>
+                  <AlertDescription>
+                      Google Maps API Key is not configured. Please set the <code className="bg-primary/10 text-primary font-mono p-1 rounded-sm text-xs">NEXT_PUBLIC_GOOGLE_MAPS_API_KEY</code> environment variable. Map functionality will be unavailable.
+                  </AlertDescription>
+                </Alert>
             )}
 
-            {!mapApiKeyError && mapConfig.apiKey && (
+            {mapConfig.apiKey && (
               <div className="h-96 w-full rounded-md border overflow-hidden">
                 <APIProvider apiKey={mapConfig.apiKey}>
                   <Map
@@ -381,15 +375,6 @@ export function ClubForm({ club, mode }: ClubFormProps) {
                   </Map>
                 </APIProvider>
               </div>
-            )}
-             {!mapConfig.apiKey && !mapApiKeyError && (
-                <Alert variant="destructive">
-                <Icons.warning className="h-4 w-4" />
-                <AlertTitle>Map Display Disabled</AlertTitle>
-                <AlertDescription>
-                    Google Maps API Key is not configured. Please set the <code className="bg-primary/10 text-primary font-mono p-1 rounded-sm text-xs">NEXT_PUBLIC_GOOGLE_MAPS_API_KEY</code> environment variable. Map functionality will be unavailable.
-                </AlertDescription>
-                </Alert>
             )}
           </CardContent>
         </Card>
@@ -565,3 +550,4 @@ export function ClubForm({ club, mode }: ClubFormProps) {
     </Form>
   );
 }
+
