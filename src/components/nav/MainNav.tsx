@@ -1,10 +1,15 @@
+// This file is no longer used as navigation items are directly rendered in AppShell.tsx using Sidebar components.
+// You can safely delete this file.
+// If you prefer to keep it as a reference, you can leave it.
+
+/*
 "use client"
 
 import * as React from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 
-import type { NavItem } from "@/types/nav" // Assuming NavItem is defined in types/nav.ts
+import type { NavItem } from "@/types/nav" 
 import { siteConfig } from "@/config/site"
 import { cn } from "@/lib/utils"
 import { Icons } from "@/components/icons"
@@ -45,3 +50,4 @@ export function MainNav({ items }: MainNavProps) {
     </div>
   )
 }
+*/

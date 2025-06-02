@@ -1,4 +1,9 @@
+// This file is no longer used as navigation has moved to AppShell.tsx with the sidebar.
+// You can safely delete this file.
+// If you prefer to keep it as a reference or for potential future use in a different context,
+// you can leave it, but it won't be actively rendered in the current setup.
 
+/*
 "use client";
 
 import Link from "next/link";
@@ -24,7 +29,7 @@ export default function SiteHeader() {
     try {
       await signOut(auth);
       toast({ title: "Signed Out", description: "You have been successfully signed out." });
-      router.push("/"); // Redirect to landing page after sign out
+      router.push("/"); 
       router.refresh();
     } catch (error) {
       toast({ title: "Sign Out Failed", description: "Could not sign out.", variant: "destructive" });
@@ -34,10 +39,10 @@ export default function SiteHeader() {
   const mainNavItems = siteConfig.mainNav
     .filter(item => {
       if (item.href === "/dashboard" || item.href === "/admin/clubs") {
-        return !!user; // Only show Dashboard and Manage Clubs if user is logged in
+        return !!user; 
       }
-      if (item.href === "/") return true; // Always show Home
-      return !user; // Show other items (like a potential future /pricing) if user is NOT logged in
+      if (item.href === "/") return true; 
+      return !user; 
     });
 
 
@@ -75,3 +80,4 @@ export default function SiteHeader() {
     </header>
   );
 }
+*/

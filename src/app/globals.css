@@ -36,6 +36,14 @@
     --status-yellow: 51 98% 45%;
     --status-orange: 30 94% 48%;
     --status-red: 0 72% 45%;
+
+    /* Sidebar specific variables */
+    --sidebar: 0 0% 100%; /* Default to background */
+    --sidebar-foreground: 240 10% 3.9%; /* Default to foreground */
+    --sidebar-border: 240 5.9% 90%; /* Default to border */
+    --sidebar-accent: 288 48% 60%; /* Default to accent */
+    --sidebar-accent-foreground: 0 0% 98%; /* Default to accent-foreground */
+    --sidebar-ring: 261 51% 47%; /* Default to ring */
   }
 
   .dark {
@@ -69,6 +77,14 @@
     --status-yellow: 51 98% 60%;
     --status-orange: 30 94% 63%;
     --status-red: 0 72% 61%;
+
+    /* Sidebar specific variables for dark mode */
+    --sidebar: 0 0% 13%; /* Default to dark background */
+    --sidebar-foreground: 0 0% 98%; /* Default to dark foreground */
+    --sidebar-border: 0 0% 20%; /* Default to dark border */
+    --sidebar-accent: 288 48% 60%; /* Default to dark accent */
+    --sidebar-accent-foreground: 0 0% 98%; /* Default to dark accent-foreground */
+    --sidebar-ring: 288 48% 70%; /* Default to dark ring */
   }
 }
 

@@ -6,7 +6,8 @@ import { cn } from "@/lib/utils";
 import { Toaster } from "@/components/ui/toaster";
 import { ThemeProvider } from '@/components/theme-provider';
 import { siteConfig } from '@/config/site';
-import AppShell from '@/components/layout/AppShell'; // New import
+import AppShell from '@/components/layout/AppShell';
+import { SidebarProvider } from "@/components/ui/sidebar"; // New import
 
 const fontInter = Inter({
   subsets: ['latin'],
@@ -24,7 +25,6 @@ export const metadata: Metadata = {
     template: `%s | ${siteConfig.name}`,
   },
   description: siteConfig.description,
-  // TODO: Add icons and manifest if this were a PWA or for better browser tab visuals
   // icons: {
   //   icon: "/favicon.ico",
   //   shortcut: "/favicon-16x16.png",
@@ -66,7 +66,9 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          <AppShell>{children}</AppShell>
+          <SidebarProvider defaultOpen={false}> {/* Default to collapsed on desktop, mobile is handled by Sheet */}
+            <AppShell>{children}</AppShell>
+          </SidebarProvider>
           <Toaster />
         </ThemeProvider>
       </body>

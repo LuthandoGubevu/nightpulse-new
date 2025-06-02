@@ -1,4 +1,6 @@
 
+import type { Icons } from "@/components/icons";
+
 export type SiteConfig = typeof siteConfig
 
 export const siteConfig = {
@@ -8,24 +10,27 @@ export const siteConfig = {
   mainNav: [
     {
       title: "Home",
-      href: "/", // Landing page
+      href: "/", 
+      icon: "logo" as keyof typeof Icons, // Or a more generic home icon like 'home' if added
     },
     {
       title: "Dashboard",
-      href: "/dashboard", // User dashboard, shown when logged in
+      href: "/dashboard",
+      icon: "barChart" as keyof typeof Icons, // Example icon
     },
     {
-      title: "Manage Clubs", // Admin section, shown when logged in (could be role-based later)
+      title: "Manage Clubs",
       href: "/admin/clubs",
+      icon: "building" as keyof typeof Icons, // Example icon
     },
-    // Example of a public link:
+    // Example for auth link (conditionally shown by AppShell)
     // {
-    //   title: "Pricing",
-    //   href: "/pricing",
-    // },
+    //   title: "Sign In",
+    //   href: "/auth",
+    //   icon: "logIn" as keyof typeof Icons,
+    // }
   ],
   links: {
-    // Add external links if any, e.g., GitHub repo
-    // github: "https://github.com/your-repo",
+    // Add external links if any
   },
 }
