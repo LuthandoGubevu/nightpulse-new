@@ -2,7 +2,7 @@
 "use client";
 
 import { Bar, BarChart, ResponsiveContainer, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from "recharts";
-import { ChartConfig, ChartContainer, ChartTooltipContent } from "@/components/ui/chart";
+import { ChartConfig, ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 
 interface HourlyVisitorsChartProps {
   data: { name: string; visitors: number }[]; // Example: { name: "10:00", visitors: 150 }
