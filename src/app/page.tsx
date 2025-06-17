@@ -28,7 +28,7 @@ export default function LandingPage() {
           </p>
           <div className="flex flex-col sm:flex-row justify-center items-center space-y-4 sm:space-y-0 sm:space-x-4 animate-fade-in">
             <Button size="lg" className="bg-accent hover:bg-accent/90 text-accent-foreground w-full sm:w-auto" asChild>
-              <Link href="/auth">
+              <Link href="/dashboard">
                 <Icons.martini className="mr-2" /> Get Started
               </Link>
             </Button>

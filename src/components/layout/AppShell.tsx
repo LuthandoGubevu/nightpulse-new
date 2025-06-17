@@ -2,7 +2,7 @@
 "use client";
 
 import React from "react";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation"; // Removed useRouter
 import Link from "next/link";
 import {
   Sidebar,
@@ -18,12 +18,12 @@ import {
 import { siteConfig } from "@/config/site";
 import { Icons } from "@/components/icons";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { useAuth } from "@/hooks/useAuth";
-import { auth } from "@/lib/firebase";
-import { signOut } from "firebase/auth";
+// import { useAuth } from "@/hooks/useAuth"; // No longer using for Sign In/Out buttons
+// import { auth } from "@/lib/firebase"; // No longer using for Sign In/Out buttons
+// import { signOut } from "firebase/auth"; // No longer using for Sign In/Out buttons
 import { useToast } from "@/hooks/use-toast";
 
-const ADMIN_EMAIL = "lgubevu@gmail.com";
+// const ADMIN_EMAIL = "lgubevu@gmail.com"; // No longer used here
 
 interface AppShellProps {
   children: React.ReactNode;
@@ -31,40 +31,37 @@ interface AppShellProps {
 
 export default function AppShell({ children }: AppShellProps) {
   const pathname = usePathname();
-  const router = useRouter();
-  const { user, loading: authLoading } = useAuth();
-  const { toast } = useToast();
+  // const router = useRouter(); // No longer needed for sign out redirection
+  // const { user, loading: authLoading } = useAuth(); // No longer used for conditional UI here
+  const { toast } = useToast(); // Keep for other potential toasts
 
-  const handleSignOut = async () => {
-    if (!auth) {
-      toast({ title: "Error", description: "Firebase Auth not initialized.", variant: "destructive" });
-      return;
-    }
-    try {
-      await signOut(auth);
-      toast({ title: "Signed Out", description: "You have been successfully signed out." });
-      router.push("/");
-      router.refresh();
-    } catch (error: any) {
-      const errorMessage = error.message || "Could not sign out.";
-      toast({ title: "Sign Out Failed", description: errorMessage, variant: "destructive" });
-    }
-  };
+  // const handleSignOut = async () => {
+  //   if (!auth) { // auth is removed from firebase.ts
+  //     toast({ title: "Error", description: "Firebase Auth not initialized.", variant: "destructive" });
+  //     return;
+  //   }
+  //   try {
+  //     await signOut(auth);
+  //     toast({ title: "Signed Out", description: "You have been successfully signed out." });
+  //     router.push("/");
+  //     router.refresh();
+  //   } catch (error: any) {
+  //     const errorMessage = error.message || "Could not sign out.";
+  //     toast({ title: "Sign Out Failed", description: errorMessage, variant: "destructive" });
+  //   }
+  // };
 
   const mainNavItems = siteConfig.mainNav.filter(item => {
-    if (item.href === "/") return true; 
+    if (item.href === "/auth") return false; // Always hide auth link
 
-    if (item.href === "/admin/clubs" || item.href === "/admin/analytics") { 
-      return user && user.email === ADMIN_EMAIL;
+    // Show home, dashboard, admin clubs, and admin analytics by default
+    if (item.href === "/" || 
+        item.href === "/dashboard" || 
+        item.href === "/admin/clubs" || 
+        item.href === "/admin/analytics") {
+      return true;
     }
-    if (item.href === "/dashboard") { 
-      return !!user; 
-    }
-    if (item.href === "/auth") { 
-        return !user; 
-    }
-    // Default to true for items not explicitly covered, though current config should be exhaustive
-    return true; 
+    return true; // Default to showing other items if any
   });
 
   const showFullAppLayout = pathname !== "/" && pathname !== "/auth";
@@ -97,15 +94,11 @@ export default function AppShell({ children }: AppShellProps) {
           <SidebarContent className="p-2 flex-grow">
             <SidebarMenu>
               {mainNavItems.map((item) => {
-                if (item.href && !(item.href === "/" && user) ) {
+                if (item.href) { // Removed: && !(item.href === "/" && user) 
                   const IconComponent = item.icon ? Icons[item.icon] : null;
-                  // Enhanced active state check for nested admin routes
                   const isItemActive = pathname === item.href || 
                                      (item.href?.startsWith("/admin") && pathname.startsWith(item.href)) ||
                                      (item.href === "/dashboard" && pathname === "/dashboard");
-
-                  // Special handling for /admin/analytics to highlight parent "/admin/clubs" if that's how the nav is structured conceptually
-                  // For now, direct match or prefix match for /admin routes is fine.
                   
                   return (
                     <SidebarMenuItem key={item.title}>
@@ -133,27 +126,7 @@ export default function AppShell({ children }: AppShellProps) {
                <div className="group-data-[collapsible=icon]:mx-auto">
                  <ThemeToggle />
                </div>
-
-              {!authLoading && (
-                user ? (
-                  <SidebarMenuButton onClick={handleSignOut} tooltip="Sign Out" className="w-full justify-start">
-                    <Icons.logOut className="h-4 w-4" />
-                    <span className="group-data-[collapsible=icon]:hidden">Sign Out</span>
-                  </SidebarMenuButton>
-                ) : (
-                  <SidebarMenuButton asChild tooltip="Sign In" className="w-full justify-start">
-                    <Link href="/auth">
-                      <Icons.logIn className="h-4 w-4" />
-                      <span className="group-data-[collapsible=icon]:hidden">Sign In</span>
-                    </Link>
-                  </SidebarMenuButton>
-                )
-              )}
-              {authLoading && (
-                <div className="flex justify-center p-2 group-data-[collapsible=icon]:w-8 group-data-[collapsible=icon]:h-8">
-                  <Icons.spinner className="h-5 w-5 animate-spin" />
-                </div>
-              )}
+              {/* Sign In/Out buttons removed */}
             </div>
           </SidebarFooter>
         </Sidebar>

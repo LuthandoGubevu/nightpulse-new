@@ -2,7 +2,7 @@
 "use client"; 
 
 import React, { useEffect, useState, useMemo } from "react";
-import { useRouter } from "next/navigation";
+// import { useRouter } from "next/navigation"; // No longer needed for auth redirection
 import { collection, getDocs, orderBy, query, Timestamp, onSnapshot } from "firebase/firestore";
 import { firestore } from "@/lib/firebase";
 import type { ClubWithId, UserLocation } from "@/types";
@@ -11,7 +11,7 @@ import { PageHeader } from "@/components/common/PageHeader";
 import ClubMapWrapper from "@/components/clubs/ClubMapWrapper";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Icons } from "@/components/icons";
-import { useAuth } from "@/hooks/useAuth"; 
+// import { useAuth } from "@/hooks/useAuth"; // No longer needed for auth redirection
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -139,8 +139,8 @@ function DashboardLoadingSkeleton() {
 }
 
 export default function DashboardPage() {
-  const { user, loading: authLoading } = useAuth();
-  const router = useRouter();
+  // const { user, loading: authLoading } = useAuth(); // Auth hook no longer used for redirection
+  // const router = useRouter(); // Router no longer used for auth redirection
   const { toast } = useToast();
 
   const [allClubs, setAllClubs] = useState<ClubWithId[]>([]);
@@ -153,18 +153,18 @@ export default function DashboardPage() {
   const [sortBy, setSortBy] = useState<string>("default"); // 'default', 'nearby', 'crowded'
   const [filterTags, setFilterTags] = useState<string[]>([]); // e.g., ['chill', 'free entry']
 
-  useEffect(() => {
-    if (!authLoading && !user) {
-      router.replace("/auth?redirect=/dashboard");
-    }
-  }, [user, authLoading, router]);
+  // useEffect(() => {
+  //   // This auth check is removed as per the requirement
+  //   // if (!authLoading && !user) {
+  //   //   router.replace("/auth?redirect=/dashboard");
+  //   // }
+  // }, [user, authLoading, router]);
 
   useEffect(() => {
-    if (!user || !firestore) {
-      if (!authLoading && !user) { // Not logged in, stop loading, potentially show mocks
-        setAllClubs(mockClubData);
-        setLoadingClubs(false);
-      }
+    if (!firestore) { // If Firestore isn't initialized (e.g., missing config)
+      console.warn("Firestore is not initialized. Displaying mock data for dashboard.");
+      setAllClubs(mockClubData);
+      setLoadingClubs(false);
       return;
     }
 
@@ -213,7 +213,7 @@ export default function DashboardPage() {
     });
 
     return () => unsubscribe();
-  }, [user, authLoading, toast]);
+  }, [toast]); // Removed user, authLoading from dependencies as they are not used for auth checks anymore
 
   const handleGetUserLocation = () => {
     if (navigator.geolocation) {
@@ -296,17 +296,18 @@ export default function DashboardPage() {
   };
 
 
-  if (authLoading || loadingClubs ) { // Show skeleton if auth or clubs are loading
+  if (loadingClubs ) { // Show skeleton if clubs are loading (authLoading is removed)
     return <DashboardLoadingSkeleton />;
   }
   
-  if (!user && !authLoading) { // If not loading and no user, redirect
-    return (
-       <div className="container mx-auto flex min-h-[calc(100vh-theme(spacing.16))] flex-col items-center justify-center py-12">
-            <p>Redirecting to sign-in...</p>
-       </div>
-    );
-  }
+  // This check is no longer needed as auth is removed
+  // if (!user && !authLoading) { 
+  //   return (
+  //      <div className="container mx-auto flex min-h-[calc(100vh-theme(spacing.16))] flex-col items-center justify-center py-12">
+  //           <p>Redirecting to sign-in...</p>
+  //      </div>
+  //   );
+  // }
   
 
   return (
@@ -366,4 +367,3 @@ export default function DashboardPage() {
     </div>
   );
 }
-

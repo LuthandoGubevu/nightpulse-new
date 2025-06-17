@@ -28,12 +28,8 @@ export const siteConfig = {
       href: "/admin/analytics",
       icon: "barChartBig" as keyof typeof Icons,
     },
-    // Example for auth link (conditionally shown by AppShell)
-    // {
-    //   title: "Sign In",
-    //   href: "/auth",
-    //   icon: "logIn" as keyof typeof Icons,
-    // }
+    // The "/auth" link is implicitly removed by AppShell filtering
+    // or can be explicitly removed from here if it was ever present.
   ],
   links: {
     // Add external links if any
