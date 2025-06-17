@@ -43,41 +43,20 @@ export function ClubCard({ club }: ClubCardProps) {
     return expiryDate > new Date();
   };
 
-  // Determine placeholder hint based on club name or tags
-  let placeholderHint = "nightclub party";
-  if (club.name.toLowerCase().includes("lounge") || club.tags?.includes("chill")) {
-    placeholderHint = "lounge bar";
-  } else if (club.name.toLowerCase().includes("rooftop") || club.tags?.includes("rooftop")) {
-    placeholderHint = "rooftop city";
-  } else if (club.tags?.includes("live music")) {
-    placeholderHint = "live concert";
-  }
-
-
   return (
     <>
       <Card className="flex flex-col overflow-hidden shadow-lg hover:shadow-xl transition-shadow duration-300">
-        <CardHeader className="p-0 relative">
-          <Image
-            src={club.imageUrl || `https://placehold.co/600x400.png?text=${encodeURIComponent(club.name)}`}
-            alt={club.name}
-            width={600}
-            height={400}
-            className="w-full h-48 object-cover"
-            data-ai-hint={placeholderHint}
-            priority={club.id.startsWith('mock-club-')} // Prioritize loading for mock images as they'll be above the fold
-          />
-           <div className="absolute top-2 right-2 bg-background/80 p-1.5 rounded-full">
-             <ClubStatusIndicator status={status} size="lg" />
-           </div>
-           {club.isTrending && (
-             <Badge variant="destructive" className="absolute top-2 left-2 animate-pulse">
+        {/* CardHeader with Image has been removed */}
+        <CardContent className="p-6 flex-grow space-y-3">
+          <div className="flex justify-between items-start">
+            <CardTitle className="text-2xl font-headline mb-1">{club.name}</CardTitle>
+            <ClubStatusIndicator status={status} size="lg" />
+          </div>
+          {club.isTrending && (
+             <Badge variant="destructive" className="mb-2 animate-pulse">
                <Icons.trendingUp className="mr-1 h-3 w-3" /> Trending Now
              </Badge>
            )}
-        </CardHeader>
-        <CardContent className="p-6 flex-grow space-y-3">
-          <CardTitle className="text-2xl font-headline mb-1">{club.name}</CardTitle>
           <CardDescription className="text-muted-foreground mb-1 flex items-center">
             <Icons.mapPin className="h-4 w-4 mr-2 flex-shrink-0" />
             {club.address}
@@ -94,7 +73,7 @@ export function ClubCard({ club }: ClubCardProps) {
             <Icons.users className="h-5 w-5 text-primary" />
             <span className="text-lg font-semibold">{club.currentCount}</span>
             <span className="text-sm text-muted-foreground">people</span>
-            <ClubStatusIndicator status={status} size="sm"/>
+            {/* Redundant status indicator removed from here as it's at the top of CardContent now */}
             <span className="text-sm font-medium">{statusTextMap[status]}</span>
           </div>
 
