@@ -23,25 +23,34 @@ const firebaseConfig = getFirebaseConfig();
 const configProblems: string[] = [];
 
 // Define critical keys and their placeholder prefixes for validation
-const criticalConfigMappings: { key: keyof typeof firebaseConfig, placeholderPrefix: string }[] = [
-  { key: 'apiKey', placeholderPrefix: 'YOUR_API_KEY' },
-  { key: 'authDomain', placeholderPrefix: 'YOUR_AUTH_DOMAIN' },
-  { key: 'projectId', placeholderPrefix: 'YOUR_PROJECT_ID' },
-  { key: 'appId', placeholderPrefix: 'YOUR_APP_ID' } 
+const criticalConfigMappings: { key: keyof typeof firebaseConfig, placeholderPrefix: string, envVarName: string }[] = [
+  { key: 'apiKey', placeholderPrefix: 'YOUR_API_KEY', envVarName: 'NEXT_PUBLIC_FIREBASE_API_KEY' },
+  { key: 'authDomain', placeholderPrefix: 'YOUR_AUTH_DOMAIN', envVarName: 'NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN' },
+  { key: 'projectId', placeholderPrefix: 'YOUR_PROJECT_ID', envVarName: 'NEXT_PUBLIC_FIREBASE_PROJECT_ID' },
+  { key: 'appId', placeholderPrefix: 'YOUR_APP_ID', envVarName: 'NEXT_PUBLIC_FIREBASE_APP_ID' }
 ];
 
 criticalConfigMappings.forEach(mapping => {
   const value = firebaseConfig[mapping.key];
-  const envVarName = `NEXT_PUBLIC_FIREBASE_${mapping.key.replace(/([A-Z])/g, '_$1').toUpperCase()}`;
-  if (!value || String(value).trim() === "" || String(value).startsWith(mapping.placeholderPrefix.substring(0,5))) { // Check for placeholder start
-    configProblems.push(`${envVarName} is missing, empty, or uses a placeholder value (e.g., starts with "YOUR_" or similar).`);
+  let problemMessage = "";
+
+  if (value === undefined) { // Check for undefined specifically
+    problemMessage = `${mapping.envVarName} is missing or undefined. Ensure it is set in your .env file and the server has been restarted.`;
+  } else if (String(value).trim() === "") {
+    problemMessage = `${mapping.envVarName} is empty. Please provide a value.`;
+  } else if (String(value).startsWith(mapping.placeholderPrefix.substring(0, 5))) { // Check for placeholder start like "YOUR_"
+    problemMessage = `${mapping.envVarName} appears to use a placeholder value (e.g., starts with "${mapping.placeholderPrefix.substring(0, 5)}"). Please use your actual Firebase credential.`;
+  }
+
+  if (problemMessage) {
+    configProblems.push(problemMessage);
   }
 });
 
 
 if (configProblems.length > 0) {
   console.warn(
-    "🔴 Firebase is not properly configured. The following issues were found with your environment variables (check your .env file):"
+    "🔴 Firebase is not properly configured. The following issues were found with your environment variables (check your .env file and ensure the server was restarted after changes):"
   );
   configProblems.forEach(problem => console.warn(`- ${problem}`));
   console.warn(
@@ -54,16 +63,16 @@ if (configProblems.length > 0) {
 } else {
   if (!getApps().length) {
     try {
-      console.info("Attempting to initialize Firebase app...");
-      app = initializeApp(firebaseConfig as any);
+      console.info("Attempting to initialize Firebase app with provided configuration...");
+      app = initializeApp(firebaseConfig as any); // Type assertion if confident config is complete by this point
       auth = getAuth(app);
       firestore = getFirestore(app);
       console.info("✅ Firebase app, auth, and firestore services initialized on server.");
-      // if (firebaseConfig.measurementId && firebaseConfig.measurementId !== "YOUR_MEASUREMENT_ID") {
+      // if (firebaseConfig.measurementId && !String(firebaseConfig.measurementId).startsWith("YOUR_")) {
       //   analytics = getAnalytics(app);
       // }
     } catch (e: any) {
-      console.error("🔴 Firebase initialization failed unexpectedly, even with seemingly valid config values in .env. Error:", e.message);
+      console.error("🔴 Firebase initialization failed unexpectedly, even with seemingly valid config values. Error:", e.message);
       app = undefined;
       auth = undefined;
       firestore = undefined;
@@ -73,16 +82,19 @@ if (configProblems.length > 0) {
     auth = getAuth(app);
     firestore = getFirestore(app);
     console.info("✅ Firebase app, auth, and firestore services re-used existing initialization on server.");
-    // if (firebaseConfig.measurementId && firebaseConfig.measurementId !== "YOUR_MEASUREMENT_ID" && app) {
+    // if (firebaseConfig.measurementId && !String(firebaseConfig.measurementId).startsWith("YOUR_") && app) {
     //   analytics = getAnalytics(app);
     // }
   }
 }
 
-if (configProblems.length === 0) { // Only perform these checks if initial config seemed okay
-    if (!app) console.error("🔴 Firebase App (app) is undefined on the server, even after initialization attempt.");
-    if (!auth) console.error("🔴 Firebase Auth (auth) is undefined on the server, even after initialization attempt. This will cause client-side errors.");
-    if (!firestore) console.error("🔴 Firebase Firestore (firestore) is undefined on the server, even after initialization attempt.");
+// Log the status of services post-attempt
+if (configProblems.length > 0 || !app || !auth || !firestore) {
+    if (!app) console.error("🔴 Final status: Firebase App (app) is undefined on the server.");
+    if (!auth) console.error("🔴 Final status: Firebase Auth (auth) is undefined on the server. This will likely cause client-side errors.");
+    if (!firestore) console.error("🔴 Final status: Firebase Firestore (firestore) is undefined on the server.");
+} else {
+    console.info("✅ Final status: Firebase app, auth, and firestore services appear to be correctly initialized on the server.");
 }
 
 
