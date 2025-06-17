@@ -22,79 +22,78 @@ import { useToast } from "@/hooks/use-toast";
 const mockClubData: ClubWithId[] = [
   {
     id: 'mock-club-1',
-    name: 'The Velvet Underground',
-    address: '123 Cool St, Music City, TX',
-    location: { lat: 30.2672, lng: -97.7431 }, // Austin
+    name: 'Sanctuary Mandela', // Example name
+    address: '4 9th St, Houghton Estate, Johannesburg, 2198',
+    location: { lat: -26.1738, lng: 28.0549 }, // Approx. Houghton Estate
     currentCount: 75,
     capacityThresholds: { low: 50, moderate: 100, packed: 150 },
     lastUpdated: new Date().toISOString(),
     imageUrl: 'https://placehold.co/600x400.png',
     // data-ai-hint will be on the Image component itself in ClubCard
     estimatedWaitTime: '5-10 min',
-    tags: ['live music', 'chill', 'cocktails'],
-    musicGenres: ['Indie Rock', 'Soul', 'Funk'],
-    tonightDJ: 'DJ Retro',
-    announcementMessage: 'Happy Hour 7-9 PM tonight!',
-    announcementExpiresAt: new Date(Date.now() + 8 * 60 * 60 * 1000).toISOString(), // 8 hours from now
+    tags: ['upscale', 'chill', 'cocktails'],
+    musicGenres: ['Jazz', 'Soul', 'Lounge'],
+    tonightDJ: 'DJ Smooth',
+    announcementMessage: 'Jazz Night from 8 PM!',
+    announcementExpiresAt: new Date(Date.now() + 8 * 60 * 60 * 1000).toISOString(),
     isTrending: false,
-    distance: 2.5, // Example distance
+    distance: 2.5, 
   },
   {
     id: 'mock-club-2',
-    name: 'Neon Pulse',
-    address: '456 Party Ave, Electro Town, CA',
-    location: { lat: 34.0522, lng: -118.2437 }, // LA
+    name: 'Truth Nightclub', // Example name
+    address: 'Old Pretoria Rd, Halfway House, Midrand, 1685', // Midrand area
+    location: { lat: -26.0000, lng: 28.1260 }, // Approx. Midrand
     currentCount: 160,
     capacityThresholds: { low: 60, moderate: 120, packed: 180 },
-    lastUpdated: new Date(Date.now() - 15 * 60 * 1000).toISOString(), // 15 mins ago
+    lastUpdated: new Date(Date.now() - 15 * 60 * 1000).toISOString(), 
     imageUrl: 'https://placehold.co/600x400.png',
     estimatedWaitTime: '20-30 min',
-    tags: ['edm', 'dance floor', 'laser show'],
+    tags: ['electronic', 'dance floor', 'underground'],
     musicGenres: ['Techno', 'House', 'Trance'],
-    tonightDJ: 'Sparkle Pony',
-    announcementMessage: 'Special guest DJ Sparkle Pony tonight!',
-    announcementExpiresAt: new Date(Date.now() + 4 * 60 * 60 * 1000).toISOString(), // 4 hours from now
+    tonightDJ: 'Voltage Control',
+    announcementMessage: 'International DJ set tonight!',
+    announcementExpiresAt: new Date(Date.now() + 4 * 60 * 60 * 1000).toISOString(),
     isTrending: true,
-    distance: 10.1,
+    distance: 15.1,
   },
   {
     id: 'mock-club-3',
-    name: 'Rooftop Rhythms',
-    address: '789 High Rd, View City, NY',
-    location: { lat: 40.7128, lng: -74.0060 }, // NYC
+    name: 'The Marabi Club', // Example name
+    address: '47 Sivewright Ave, New Doornfontein, Johannesburg, 2094',
+    location: { lat: -26.1995, lng: 28.0565 }, // Approx. Maboneng/New Doornfontein
     currentCount: 40,
     capacityThresholds: { low: 30, moderate: 70, packed: 100 },
-    lastUpdated: new Date(Date.now() - 60 * 60 * 1000).toISOString(), // 1 hour ago
+    lastUpdated: new Date(Date.now() - 60 * 60 * 1000).toISOString(),
     imageUrl: 'https://placehold.co/600x400.png',
-    tags: ['rooftop', 'scenic view', 'lounge'],
-    musicGenres: ['Jazz Fusion', 'Lo-fi', 'Ambient'],
+    tags: ['live jazz', 'dinner', 'vintage'],
+    musicGenres: ['Jazz', 'Blues', 'Swing'],
     tonightDJ: '',
-    announcementMessage: '',
-    announcementExpiresAt: null,
+    announcementMessage: 'Live band starts at 9 PM.',
+    announcementExpiresAt: new Date(Date.now() + 5 * 60 * 60 * 1000).toISOString(),
     isTrending: false,
     distance: 5.7,
   },
     {
     id: 'mock-club-4',
-    name: 'The Bassment',
-    address: '000 Underground Ln, Metro City, IL',
-    location: { lat: 41.8781, lng: -87.6298 }, // Chicago
-    currentCount: 220, // Over-packed
+    name: 'And Club', // Example name
+    address: '39a Gwi Gwi Mrwebi St, Newtown, Johannesburg, 2113',
+    location: { lat: -26.2044, lng: 28.0353 }, // Approx. Newtown
+    currentCount: 220, 
     capacityThresholds: { low: 50, moderate: 100, packed: 150 },
-    lastUpdated: new Date(Date.now() - 5 * 60 * 1000).toISOString(), // 5 mins ago
+    lastUpdated: new Date(Date.now() - 5 * 60 * 1000).toISOString(), 
     imageUrl: 'https://placehold.co/600x400.png',
     estimatedWaitTime: '45+ min (At Capacity)',
-    tags: ['underground', 'heavy bass', 'late night'],
-    musicGenres: ['Dubstep', 'Drum & Bass', 'Grime'],
-    tonightDJ: 'DJ SubZero',
-    announcementMessage: 'Doors close soon due to capacity!',
-    announcementExpiresAt: new Date(Date.now() + 1 * 60 * 60 * 1000).toISOString(), // 1 hour from now
+    tags: ['techno', 'underground', 'late night'],
+    musicGenres: ['Techno', 'Minimal', 'Deep House'],
+    tonightDJ: 'Resident DJs',
+    announcementMessage: 'Last entry 2 AM due to capacity!',
+    announcementExpiresAt: new Date(Date.now() + 1 * 60 * 60 * 1000).toISOString(), 
     isTrending: true,
     distance: 1.2,
   }
 ].map(club => ({
   ...club,
-  // Ensure image URL is set for ClubCard, with a fallback including name
   imageUrl: club.imageUrl || `https://placehold.co/600x400.png?text=${encodeURIComponent(club.name)}`,
 }));
 
@@ -367,3 +366,4 @@ export default function DashboardPage() {
     </div>
   );
 }
+

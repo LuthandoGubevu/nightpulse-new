@@ -5,19 +5,34 @@ import { firestore } from '@/lib/firebase';
 import { collection, query, where, getDocs, orderBy, limit, Timestamp } from 'firebase/firestore';
 import type { Visit } from '@/types';
 
-// Mock historical data for specific mock club IDs
+// Mock historical data for specific mock club IDs in Johannesburg
 const mockClubVisitHistory: Record<string, Partial<Visit>[]> = {
-  'mock-club-1': [ // The Velvet Underground
-    { entryTimestamp: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000 - 2 * 60 * 60 * 1000).toISOString(), exitTimestamp: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000 - 1 * 60 * 60 * 1000).toISOString() }, // 5 days ago, 1hr duration
-    { entryTimestamp: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000 - 3 * 60 * 60 * 1000).toISOString(), exitTimestamp: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000 - 2 * 60 * 60 * 1000).toISOString() }, // 5 days ago, 1hr duration
-    { entryTimestamp: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000 - 4 * 60 * 60 * 1000).toISOString(), exitTimestamp: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000 - 2 * 60 * 60 * 1000).toISOString() }, // yesterday, 2hr duration
+  'mock-club-1': [ // Sanctuary Mandela
+    // Simulate weekend pattern - busier Fri/Sat nights
+    // Friday night (5 days ago if today is Wednesday for example)
+    { entryTimestamp: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000 - (24-21) * 60 * 60 * 1000).toISOString(), exitTimestamp: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000 - (24-23) * 60 * 60 * 1000).toISOString() }, // 9 PM - 11 PM
+    { entryTimestamp: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000 - (24-22) * 60 * 60 * 1000).toISOString(), exitTimestamp: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000 - (24-24) * 60 * 60 * 1000).toISOString() }, // 10 PM - 12 AM
+    // Saturday night (4 days ago)
+    { entryTimestamp: new Date(Date.now() - 4 * 24 * 60 * 60 * 1000 - (24-20) * 60 * 60 * 1000).toISOString(), exitTimestamp: new Date(Date.now() - 4 * 24 * 60 * 60 * 1000 - (24-22) * 60 * 60 * 1000).toISOString() }, // 8 PM - 10 PM
+    { entryTimestamp: new Date(Date.now() - 4 * 24 * 60 * 60 * 1000 - (24-23) * 60 * 60 * 1000).toISOString(), exitTimestamp: new Date(Date.now() - 4 * 24 * 60 * 60 * 1000 - (24-25) * 60 * 60 * 1000).toISOString() }, // 11 PM - 1 AM
   ],
-  'mock-club-2': [ // Neon Pulse
-    { entryTimestamp: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000 - 22 * 60 * 60 * 1000).toISOString(), exitTimestamp: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000 - 20 * 60 * 60 * 1000).toISOString() }, // 2 days ago, 10PM-12AM like, 2hr duration
-    { entryTimestamp: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000 - 23 * 60 * 60 * 1000).toISOString(), exitTimestamp: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000 - 21 * 60 * 60 * 1000).toISOString() }, // 2 days ago, 11PM-1AM like, 2hr duration
-    { entryTimestamp: new Date(Date.now() - 0 * 24 * 60 * 60 * 1000 - 2 * 60 * 60 * 1000).toISOString(), exitTimestamp: new Date(Date.now() - 0 * 24 * 60 * 60 * 1000 - 0 * 60 * 60 * 1000).toISOString() }, // today, couple hours ago, 2hr duration
+  'mock-club-2': [ // Truth Nightclub
+    // Simulate late night techno club pattern
+    // Friday (5 days ago)
+    { entryTimestamp: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000 - (24-23) * 60 * 60 * 1000).toISOString(), exitTimestamp: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000 - (24-26) * 60 * 60 * 1000).toISOString() }, // 11 PM - 2 AM
+    { entryTimestamp: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000 - (24-24) * 60 * 60 * 1000).toISOString(), exitTimestamp: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000 - (24-27) * 60 * 60 * 1000).toISOString() }, // 12 AM - 3 AM
+    // Saturday (4 days ago)
+    { entryTimestamp: new Date(Date.now() - 4 * 24 * 60 * 60 * 1000 - (24-22) * 60 * 60 * 1000).toISOString(), exitTimestamp: new Date(Date.now() - 4 * 24 * 60 * 60 * 1000 - (24-25) * 60 * 60 * 1000).toISOString() }, // 10 PM - 1 AM
   ],
-  // Add more mock history for other mock clubs if needed
+  'mock-club-4': [ // And Club (Packed)
+    // Consistently busy on weekends
+    // Friday (5 days ago)
+    { entryTimestamp: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000 - (24-22) * 60 * 60 * 1000).toISOString(), exitTimestamp: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000 - (24-25) * 60 * 60 * 1000).toISOString() }, // 10 PM - 1 AM
+    // Saturday (4 days ago)
+    { entryTimestamp: new Date(Date.now() - 4 * 24 * 60 * 60 * 1000 - (24-21) * 60 * 60 * 1000).toISOString(), exitTimestamp: new Date(Date.now() - 4 * 24 * 60 * 60 * 1000 - (24-24) * 60 * 60 * 1000).toISOString() }, // 9 PM - 12 AM
+    // Current day, recent activity
+    { entryTimestamp: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(), exitTimestamp: new Date(Date.now() - 0.5 * 60 * 60 * 1000).toISOString() }, // 2 hours ago, 1.5hr duration
+  ],
 };
 
 
@@ -30,6 +45,7 @@ async function getHistoricalDataForClub(clubId: string): Promise<string> {
       return JSON.stringify(mockClubVisitHistory[clubId].map(v => ({
         entry: v.entryTimestamp,
         exit: v.exitTimestamp,
+        userId: v.userId || 'mock-user', // Add userId if available in mock, else default
       })));
     }
     return JSON.stringify([]);
@@ -50,6 +66,7 @@ async function getHistoricalDataForClub(clubId: string): Promise<string> {
       return JSON.stringify(mockClubVisitHistory[clubId].map(v => ({
         entry: v.entryTimestamp,
         exit: v.exitTimestamp,
+        userId: v.userId || 'mock-user',
       })));
     }
 
@@ -61,6 +78,7 @@ async function getHistoricalDataForClub(clubId: string): Promise<string> {
       return {
         entry: entryTimestamp,
         exit: exitTimestamp,
+        userId: data.userId, // Include userId from Firestore
       };
     });
     return JSON.stringify(visits);
@@ -71,6 +89,7 @@ async function getHistoricalDataForClub(clubId: string): Promise<string> {
       return JSON.stringify(mockClubVisitHistory[clubId].map(v => ({
         entry: v.entryTimestamp,
         exit: v.exitTimestamp,
+        userId: v.userId || 'mock-user',
       })));
     }
     return JSON.stringify([]);
