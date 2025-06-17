@@ -19,6 +19,85 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { haversineDistance, getClubStatus } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 
+const mockClubData: ClubWithId[] = [
+  {
+    id: 'mock-club-1',
+    name: 'The Velvet Underground',
+    address: '123 Cool St, Music City, TX',
+    location: { lat: 30.2672, lng: -97.7431 }, // Austin
+    currentCount: 75,
+    capacityThresholds: { low: 50, moderate: 100, packed: 150 },
+    lastUpdated: new Date().toISOString(),
+    imageUrl: 'https://placehold.co/600x400.png',
+    // data-ai-hint will be on the Image component itself in ClubCard
+    estimatedWaitTime: '5-10 min',
+    tags: ['live music', 'chill', 'cocktails'],
+    musicGenres: ['Indie Rock', 'Soul', 'Funk'],
+    tonightDJ: 'DJ Retro',
+    announcementMessage: 'Happy Hour 7-9 PM tonight!',
+    announcementExpiresAt: new Date(Date.now() + 8 * 60 * 60 * 1000).toISOString(), // 8 hours from now
+    isTrending: false,
+    distance: 2.5, // Example distance
+  },
+  {
+    id: 'mock-club-2',
+    name: 'Neon Pulse',
+    address: '456 Party Ave, Electro Town, CA',
+    location: { lat: 34.0522, lng: -118.2437 }, // LA
+    currentCount: 160,
+    capacityThresholds: { low: 60, moderate: 120, packed: 180 },
+    lastUpdated: new Date(Date.now() - 15 * 60 * 1000).toISOString(), // 15 mins ago
+    imageUrl: 'https://placehold.co/600x400.png',
+    estimatedWaitTime: '20-30 min',
+    tags: ['edm', 'dance floor', 'laser show'],
+    musicGenres: ['Techno', 'House', 'Trance'],
+    tonightDJ: 'Sparkle Pony',
+    announcementMessage: 'Special guest DJ Sparkle Pony tonight!',
+    announcementExpiresAt: new Date(Date.now() + 4 * 60 * 60 * 1000).toISOString(), // 4 hours from now
+    isTrending: true,
+    distance: 10.1,
+  },
+  {
+    id: 'mock-club-3',
+    name: 'Rooftop Rhythms',
+    address: '789 High Rd, View City, NY',
+    location: { lat: 40.7128, lng: -74.0060 }, // NYC
+    currentCount: 40,
+    capacityThresholds: { low: 30, moderate: 70, packed: 100 },
+    lastUpdated: new Date(Date.now() - 60 * 60 * 1000).toISOString(), // 1 hour ago
+    imageUrl: 'https://placehold.co/600x400.png',
+    tags: ['rooftop', 'scenic view', 'lounge'],
+    musicGenres: ['Jazz Fusion', 'Lo-fi', 'Ambient'],
+    tonightDJ: '',
+    announcementMessage: '',
+    announcementExpiresAt: null,
+    isTrending: false,
+    distance: 5.7,
+  },
+    {
+    id: 'mock-club-4',
+    name: 'The Bassment',
+    address: '000 Underground Ln, Metro City, IL',
+    location: { lat: 41.8781, lng: -87.6298 }, // Chicago
+    currentCount: 220, // Over-packed
+    capacityThresholds: { low: 50, moderate: 100, packed: 150 },
+    lastUpdated: new Date(Date.now() - 5 * 60 * 1000).toISOString(), // 5 mins ago
+    imageUrl: 'https://placehold.co/600x400.png',
+    estimatedWaitTime: '45+ min (At Capacity)',
+    tags: ['underground', 'heavy bass', 'late night'],
+    musicGenres: ['Dubstep', 'Drum & Bass', 'Grime'],
+    tonightDJ: 'DJ SubZero',
+    announcementMessage: 'Doors close soon due to capacity!',
+    announcementExpiresAt: new Date(Date.now() + 1 * 60 * 60 * 1000).toISOString(), // 1 hour from now
+    isTrending: true,
+    distance: 1.2,
+  }
+].map(club => ({
+  ...club,
+  // Ensure image URL is set for ClubCard, with a fallback including name
+  imageUrl: club.imageUrl || `https://placehold.co/600x400.png?text=${encodeURIComponent(club.name)}`,
+}));
+
 
 function DashboardLoadingSkeleton() {
   return (
@@ -82,7 +161,10 @@ export default function DashboardPage() {
 
   useEffect(() => {
     if (!user || !firestore) {
-      if (!authLoading && !user) setLoadingClubs(false); // Not logged in, stop loading
+      if (!authLoading && !user) { // Not logged in, stop loading, potentially show mocks
+        setAllClubs(mockClubData);
+        setLoadingClubs(false);
+      }
       return;
     }
 
@@ -93,7 +175,6 @@ export default function DashboardPage() {
     const unsubscribe = onSnapshot(q, (querySnapshot) => {
       const clubList = querySnapshot.docs.map(doc => {
         const data = doc.data();
-        // Ensure announcementExpiresAt is correctly handled (Date or null)
         let announcementExpiresAt = null;
         if (data.announcementExpiresAt) {
             announcementExpiresAt = data.announcementExpiresAt instanceof Timestamp ? data.announcementExpiresAt.toDate() : new Date(data.announcementExpiresAt);
@@ -117,11 +198,17 @@ export default function DashboardPage() {
           isTrending: getClubStatus(data.currentCount || 0, data.capacityThresholds || {}) === 'packed' || getClubStatus(data.currentCount || 0, data.capacityThresholds || {}) === 'over-packed',
         } as ClubWithId;
       });
-      setAllClubs(clubList);
+      
+      if (clubList.length === 0) {
+        setAllClubs(mockClubData); // Use mock data if Firestore returns empty
+      } else {
+        setAllClubs(clubList);
+      }
       setLoadingClubs(false);
     }, (error) => {
       console.error("Error fetching clubs with real-time listener:", error);
-      toast({ title: "Error", description: "Could not fetch club data.", variant: "destructive" });
+      toast({ title: "Error", description: "Could not fetch club data. Displaying sample data.", variant: "destructive" });
+      setAllClubs(mockClubData); // Use mock data on error
       setLoadingClubs(false);
     });
 
@@ -135,7 +222,7 @@ export default function DashboardPage() {
         (position) => {
           setUserLocation({ lat: position.coords.latitude, lng: position.coords.longitude });
           setLocationLoading(false);
-          setSortBy("nearby"); // Automatically sort by nearby when location is fetched
+          setSortBy("nearby"); 
           toast({ title: "Location Found", description: "Sorting clubs by your location." });
         },
         (error) => {
@@ -152,7 +239,6 @@ export default function DashboardPage() {
   const processedClubs = useMemo(() => {
     let clubsToProcess = [...allClubs];
 
-    // Calculate distances if userLocation is available
     if (userLocation) {
       clubsToProcess = clubsToProcess.map(club => ({
         ...club,
@@ -160,35 +246,29 @@ export default function DashboardPage() {
       }));
     }
 
-    // Filtering
     if (filterTags.length > 0) {
       clubsToProcess = clubsToProcess.filter(club => 
         filterTags.every(filterTag => {
           if (filterTag === "trending") return club.isTrending;
-          // Assuming other filterTags directly match club.tags
           return club.tags?.includes(filterTag);
         })
       );
     }
     
-    // Sorting
-    // 1. Always bring trending clubs to the top, unless sorting by distance specifically
-    if (sortBy !== "nearby") { // If not sorting by nearby, trending clubs get precedence
+    if (sortBy !== "nearby") {
         clubsToProcess.sort((a, b) => {
             if (a.isTrending && !b.isTrending) return -1;
             if (!a.isTrending && b.isTrending) return 1;
-            // Then apply other sort criteria
             if (sortBy === "crowded") return (b.currentCount || 0) - (a.currentCount || 0);
-            return a.name.localeCompare(b.name); // Default sort by name
+            return a.name.localeCompare(b.name); 
         });
-    } else if (userLocation) { // Sorting by nearby
+    } else if (userLocation) { 
          clubsToProcess.sort((a, b) => (a.distance ?? Infinity) - (b.distance ?? Infinity));
-    } else if (sortBy === "crowded") { // Sorting by crowded without location
+    } else if (sortBy === "crowded") { 
         clubsToProcess.sort((a,b) => (b.currentCount || 0) - (a.currentCount || 0));
-    } else { // Default sort by name if no other criteria met
+    } else { 
         clubsToProcess.sort((a,b) => a.name.localeCompare(b.name));
     }
-
 
     return clubsToProcess;
   }, [allClubs, userLocation, sortBy, filterTags]);
@@ -201,34 +281,33 @@ export default function DashboardPage() {
 
   const handleSortChange = (value: string) => {
     if (value === "nearby" && !userLocation) {
-      handleGetUserLocation(); // Prompt for location if not available and user selects "nearby"
+      handleGetUserLocation(); 
     } else {
       setSortBy(value);
     }
   };
 
   const handleFilterChange = (value: string) => {
-    // For simplicity, this example handles one filter at a time. 
-    // For multi-select, filterTags would be an array managed by adding/removing tags.
     if (value === "all") {
         setFilterTags([]);
     } else {
-        setFilterTags([value]); // Replace current filter
+        setFilterTags([value]);
     }
   };
 
 
-  if (authLoading || (!user && !authLoading) || loadingClubs ) {
+  if (authLoading || loadingClubs ) { // Show skeleton if auth or clubs are loading
     return <DashboardLoadingSkeleton />;
   }
   
-  if (!user) {
+  if (!user && !authLoading) { // If not loading and no user, redirect
     return (
        <div className="container mx-auto flex min-h-[calc(100vh-theme(spacing.16))] flex-col items-center justify-center py-12">
             <p>Redirecting to sign-in...</p>
        </div>
     );
   }
+  
 
   return (
     <div className="container mx-auto py-8 px-4">
@@ -261,8 +340,8 @@ export default function DashboardPage() {
               <SelectItem value="all">Filter: All</SelectItem>
               <SelectItem value="trending">Filter: Trending Now 🔥</SelectItem>
               <SelectItem value="chill">Filter: Chill Vibe</SelectItem>
-              <SelectItem value="free entry">Filter: Free Entry</SelectItem>
-              {/* Add more based on common tags */}
+              <SelectItem value="live music">Filter: Live Music</SelectItem>
+              <SelectItem value="rooftop">Filter: Rooftop</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -287,3 +366,4 @@ export default function DashboardPage() {
     </div>
   );
 }
+

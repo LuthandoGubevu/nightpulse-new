@@ -11,7 +11,7 @@ import type { ClubWithId, ClubStatus } from "@/types";
 import { getClubStatus, formatDate } from "@/lib/utils";
 import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
-import { ClubTimelineDialog } from "./ClubTimelineDialog"; // New import
+import { ClubTimelineDialog } from "./ClubTimelineDialog"; 
 import { Timestamp } from "firebase/firestore";
 
 interface ClubCardProps {
@@ -20,7 +20,7 @@ interface ClubCardProps {
 
 export function ClubCard({ club }: ClubCardProps) {
   const [isWaitTimeDialogOpen, setIsWaitTimeDialogOpen] = useState(false);
-  const [isTimelineDialogOpen, setIsTimelineDialogOpen] = useState(false); // New state for timeline dialog
+  const [isTimelineDialogOpen, setIsTimelineDialogOpen] = useState(false); 
 
   const status: ClubStatus = getClubStatus(club.currentCount, club.capacityThresholds);
 
@@ -34,14 +34,25 @@ export function ClubCard({ club }: ClubCardProps) {
 
   const isAnnouncementActive = () => {
     if (!club.announcementMessage) return false;
-    if (!club.announcementExpiresAt) return true; // No expiry means always active if message exists
+    if (!club.announcementExpiresAt) return true; 
     
     const expiryDate = club.announcementExpiresAt instanceof Timestamp 
       ? club.announcementExpiresAt.toDate() 
-      : new Date(club.announcementExpiresAt as string | Date); // Cast needed if it's string
+      : new Date(club.announcementExpiresAt as string | Date); 
 
     return expiryDate > new Date();
   };
+
+  // Determine placeholder hint based on club name or tags
+  let placeholderHint = "nightclub party";
+  if (club.name.toLowerCase().includes("lounge") || club.tags?.includes("chill")) {
+    placeholderHint = "lounge bar";
+  } else if (club.name.toLowerCase().includes("rooftop") || club.tags?.includes("rooftop")) {
+    placeholderHint = "rooftop city";
+  } else if (club.tags?.includes("live music")) {
+    placeholderHint = "live concert";
+  }
+
 
   return (
     <>
@@ -53,7 +64,8 @@ export function ClubCard({ club }: ClubCardProps) {
             width={600}
             height={400}
             className="w-full h-48 object-cover"
-            data-ai-hint="nightclub party"
+            data-ai-hint={placeholderHint}
+            priority={club.id.startsWith('mock-club-')} // Prioritize loading for mock images as they'll be above the fold
           />
            <div className="absolute top-2 right-2 bg-background/80 p-1.5 rounded-full">
              <ClubStatusIndicator status={status} size="lg" />

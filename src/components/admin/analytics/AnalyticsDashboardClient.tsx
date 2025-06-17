@@ -12,12 +12,40 @@ import { BusiestDayChart } from "./BusiestDayChart";
 import { VisitMetricsWidget } from "./VisitMetricsWidget";
 import { Skeleton } from "@/components/ui/skeleton";
 
-// Mock data processing functions (replace with actual logic)
+// Helper to generate mock visits
+function generateMockVisits(numberOfVisits: number, clubIds: string[]): Visit[] {
+  const visits: Visit[] = [];
+  const now = Date.now();
+  const daysInMonth = 30;
+
+  for (let i = 0; i < numberOfVisits; i++) {
+    const clubId = clubIds[Math.floor(Math.random() * clubIds.length)];
+    const randomDayAgo = Math.floor(Math.random() * daysInMonth);
+    const randomHour = Math.floor(Math.random() * 24);
+    const randomMinute = Math.floor(Math.random() * 60);
+    
+    const entryTime = new Date(now - randomDayAgo * 24 * 60 * 60 * 1000);
+    entryTime.setHours(randomHour, randomMinute, 0, 0);
+
+    const durationMinutes = Math.floor(Math.random() * 180) + 30; // 30 min to 3.5 hours
+    const exitTime = new Date(entryTime.getTime() + durationMinutes * 60 * 1000);
+
+    visits.push({
+      userId: `mock-user-${Math.floor(Math.random() * 1000)}`,
+      deviceId: `mock-device-${Math.floor(Math.random() * 1000)}`,
+      clubId: clubId,
+      entryTimestamp: entryTime.toISOString(),
+      exitTimestamp: exitTime.toISOString(),
+    });
+  }
+  return visits;
+}
+
+const mockClubIdsForAnalytics = ['mock-club-1', 'mock-club-2', 'mock-club-3', 'mock-club-4'];
+const fallbackMockVisits = generateMockVisits(250, mockClubIdsForAnalytics); // Generate 250 mock visits for analytics
+
+
 async function processHourlyData(visits: Visit[]): Promise<any[]> {
-    // Placeholder: Group visits by hour
-    console.log("Processing hourly data for", visits.length, "visits");
-    await new Promise(res => setTimeout(res, 500)); // Simulate processing
-    // Example structure: { hour: "00:00", visitors: 10 }
     const hourlyCounts: { [key: string]: number } = {};
     for (let i = 0; i < 24; i++) {
         hourlyCounts[i.toString().padStart(2, '0') + ":00"] = 0;
@@ -33,9 +61,6 @@ async function processHourlyData(visits: Visit[]): Promise<any[]> {
 }
 
 async function processBusiestDayData(visits: Visit[]): Promise<any[]> {
-    // Placeholder: Group visits by day of the week
-    console.log("Processing busiest day data for", visits.length, "visits");
-    await new Promise(res => setTimeout(res, 500));
     const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
     const dailyCounts: { [key: string]: number } = {};
     days.forEach(day => dailyCounts[day] = 0);
@@ -51,29 +76,26 @@ async function processBusiestDayData(visits: Visit[]): Promise<any[]> {
 }
 
 async function processVisitMetrics(visits: Visit[]): Promise<{ avgDuration: string; newVsReturning: { new: number; returning: number } }> {
-    console.log("Processing visit metrics for", visits.length, "visits");
-    await new Promise(res => setTimeout(res, 500));
-    // Placeholder calculations
     let totalDuration = 0;
-    let completedVisits = 0;
+    let completedVisitsCount = 0;
     const deviceVisits: { [key: string]: number } = {};
 
     visits.forEach(visit => {
         if (visit.entryTimestamp && visit.exitTimestamp) {
             const entry = visit.entryTimestamp instanceof Timestamp ? visit.entryTimestamp.toDate() : new Date(visit.entryTimestamp);
             const exit = visit.exitTimestamp instanceof Timestamp ? visit.exitTimestamp.toDate() : new Date(visit.exitTimestamp);
-            const duration = (exit.getTime() - entry.getTime()) / (1000 * 60); // in minutes
-            if (duration > 0) {
+            const duration = (exit.getTime() - entry.getTime()) / (1000 * 60); 
+            if (duration > 0 && duration < 12 * 60) { // Filter out very long/short durations
                 totalDuration += duration;
-                completedVisits++;
+                completedVisitsCount++;
             }
         }
-        if(visit.deviceId) {
+        if(visit.deviceId) { // Ensure deviceId is present
             deviceVisits[visit.deviceId] = (deviceVisits[visit.deviceId] || 0) + 1;
         }
     });
 
-    const avgDurationMinutes = completedVisits > 0 ? totalDuration / completedVisits : 0;
+    const avgDurationMinutes = completedVisitsCount > 0 ? totalDuration / completedVisitsCount : 0;
     
     let newVisitors = 0;
     let returningVisitors = 0;
@@ -99,9 +121,15 @@ export function AnalyticsDashboardClient() {
   const [visitMetrics, setVisitMetrics] = useState<{ avgDuration: string; newVsReturning: { new: number; returning: number } } | null>(null);
   const [loadingHistorical, setLoadingHistorical] = useState(true);
 
-  // Real-time active clubs
   useEffect(() => {
-    if (!firestore) return;
+    if (!firestore) {
+        // For mock active clubs, could use mockClubData length if available
+        // For simplicity, showing 0 or a fixed mock number.
+        setActiveClubs(2); // Example: 2 mock active clubs
+        setTotalClubs(4);  // Example: 4 total mock clubs
+        setLoadingActiveClubs(false);
+        return;
+    }
     const clubsRef = collection(firestore, "clubs");
     const unsubscribe = onSnapshot(query(clubsRef), (snapshot) => {
       let count = 0;
@@ -113,48 +141,64 @@ export function AnalyticsDashboardClient() {
       setActiveClubs(count);
       setTotalClubs(snapshot.docs.length);
       setLoadingActiveClubs(false);
+
+      // If no clubs, analytics will also likely show mock visit data
+      if (snapshot.docs.length === 0) {
+        console.log("No live clubs found, analytics will use mock visit data.");
+      }
+
     }, (error) => {
         console.error("Error fetching active clubs:", error);
+        setActiveClubs(2); 
+        setTotalClubs(4); 
         setLoadingActiveClubs(false);
     });
     return () => unsubscribe();
   }, []);
 
-  // Historical data (fetch once on mount)
   useEffect(() => {
     async function fetchHistoricalData() {
-      if (!firestore) return;
       setLoadingHistorical(true);
-      try {
-        const visitsRef = collection(firestore, "visits");
-        // Consider adding a date range filter for visits (e.g., last 30 days)
-        const thirtyDaysAgo = new Date();
-        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-        const visitsQuery = query(visitsRef, where("entryTimestamp", ">=", Timestamp.fromDate(thirtyDaysAgo)));
+      let visitsToProcess: Visit[] = [];
 
-        const snapshot = await getDocs(visitsQuery);
-        const visits = snapshot.docs.map(doc => doc.data() as Visit);
+      if (!firestore) {
+        console.warn("Firestore unavailable for analytics. Using mock visit data.");
+        visitsToProcess = fallbackMockVisits;
+      } else {
+        try {
+          const visitsRef = collection(firestore, "visits");
+          const thirtyDaysAgo = new Date();
+          thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+          const visitsQuery = query(visitsRef, where("entryTimestamp", ">=", Timestamp.fromDate(thirtyDaysAgo)));
 
-        setHourlyData(await processHourlyData(visits));
-        setBusiestDayData(await processBusiestDayData(visits));
-        setVisitMetrics(await processVisitMetrics(visits));
-
-      } catch (error) {
-        console.error("Error fetching historical visit data:", error);
-      } finally {
-        setLoadingHistorical(false);
+          const snapshot = await getDocs(visitsQuery);
+          if (snapshot.empty) {
+            console.log("No real visit data found in Firestore for analytics. Using mock data.");
+            visitsToProcess = fallbackMockVisits;
+          } else {
+            visitsToProcess = snapshot.docs.map(doc => doc.data() as Visit);
+          }
+        } catch (error) {
+          console.error("Error fetching historical visit data for analytics:", error);
+          console.log("Using mock visit data for analytics due to error.");
+          visitsToProcess = fallbackMockVisits;
+        }
       }
+
+      setHourlyData(await processHourlyData(visitsToProcess));
+      setBusiestDayData(await processBusiestDayData(visitsToProcess));
+      setVisitMetrics(await processVisitMetrics(visitsToProcess));
+      setLoadingHistorical(false);
     }
     fetchHistoricalData();
   }, []);
 
   return (
     <div className="space-y-6">
-      {/* Real-time Metrics Section */}
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Active Clubs</CardTitle>
+            <CardTitle className="text-sm font-medium">Active Clubs Now</CardTitle>
             <Icons.activity className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
@@ -162,15 +206,24 @@ export function AnalyticsDashboardClient() {
             {!loadingActiveClubs && <p className="text-xs text-muted-foreground">out of {totalClubs} total clubs</p>}
           </CardContent>
         </Card>
-        {/* Placeholder for other real-time metrics if any */}
+         <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Visits (Last 30 Days)</CardTitle>
+            <Icons.users className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            {loadingHistorical ? <Skeleton className="h-8 w-1/2" /> : <div className="text-2xl font-bold">{ hourlyData.reduce((acc, curr) => acc + curr.visitors, 0) || fallbackMockVisits.length }</div> }
+            {!loadingHistorical && <p className="text-xs text-muted-foreground">Across all clubs (real or sample)</p>}
+          </CardContent>
+        </Card>
+        <VisitMetricsWidget metrics={visitMetrics} loading={loadingHistorical} />
       </div>
 
-      {/* Historical Analytics Section */}
       <div className="grid gap-6 md:grid-cols-1 lg:grid-cols-2">
         <Card className="col-span-1 lg:col-span-2">
           <CardHeader>
             <CardTitle>Hourly Visitors Trend (Last 30 Days)</CardTitle>
-            <CardDescription>Number of new entries per hour.</CardDescription>
+            <CardDescription>Average new entries per hour (real or sample data).</CardDescription>
           </CardHeader>
           <CardContent className="pl-2">
             {loadingHistorical ? <Skeleton className="h-72 w-full" /> : <HourlyVisitorsChart data={hourlyData} />}
@@ -179,13 +232,13 @@ export function AnalyticsDashboardClient() {
         <Card>
           <CardHeader>
             <CardTitle>Busiest Night of the Week (Last 30 Days)</CardTitle>
-            <CardDescription>Total entries per day of the week.</CardDescription>
+            <CardDescription>Total entries per day of the week (real or sample data).</CardDescription>
           </CardHeader>
           <CardContent className="pl-2">
              {loadingHistorical ? <Skeleton className="h-72 w-full" /> : <BusiestDayChart data={busiestDayData} />}
           </CardContent>
         </Card>
-        <VisitMetricsWidget metrics={visitMetrics} loading={loadingHistorical} />
+        {/* Removed the extra VisitMetricsWidget that was here to avoid duplication, as one is in the top row */}
       </div>
     </div>
   );

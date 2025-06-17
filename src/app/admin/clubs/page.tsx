@@ -12,6 +12,43 @@ import { collection, onSnapshot, orderBy, query, Timestamp } from "firebase/fire
 import type { ClubWithId } from "@/types";
 import { useEffect, useState } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useToast } from "@/hooks/use-toast"; // Added for potential error messaging
+
+const mockAdminClubData: ClubWithId[] = [
+  {
+    id: 'mock-club-1',
+    name: 'The Velvet Underground',
+    address: '123 Cool St, Music City, TX',
+    location: { lat: 30.2672, lng: -97.7431 },
+    currentCount: 75,
+    capacityThresholds: { low: 50, moderate: 100, packed: 150 },
+    lastUpdated: new Date().toISOString(),
+    imageUrl: 'https://placehold.co/600x400.png?text=Velvet+Underground',
+    estimatedWaitTime: '5-10 min',
+    tags: ['live music', 'chill', 'cocktails'],
+    musicGenres: ['Indie Rock', 'Soul', 'Funk'],
+    tonightDJ: 'DJ Retro',
+    announcementMessage: 'Happy Hour 7-9 PM tonight!',
+    announcementExpiresAt: new Date(Date.now() + 8 * 60 * 60 * 1000).toISOString(),
+  },
+  {
+    id: 'mock-club-2',
+    name: 'Neon Pulse',
+    address: '456 Party Ave, Electro Town, CA',
+    location: { lat: 34.0522, lng: -118.2437 },
+    currentCount: 160,
+    capacityThresholds: { low: 60, moderate: 120, packed: 180 },
+    lastUpdated: new Date(Date.now() - 15 * 60 * 1000).toISOString(),
+    imageUrl: 'https://placehold.co/600x400.png?text=Neon+Pulse',
+    estimatedWaitTime: '20-30 min',
+    tags: ['edm', 'dance floor', 'laser show'],
+    musicGenres: ['Techno', 'House', 'Trance'],
+    tonightDJ: 'Sparkle Pony',
+    announcementMessage: 'Special guest DJ Sparkle Pony tonight!',
+    announcementExpiresAt: new Date(Date.now() + 4 * 60 * 60 * 1000).toISOString(),
+  },
+];
+
 
 function ClubsDataTableSkeleton() {
   return (
@@ -38,10 +75,12 @@ function ClubsDataTableSkeleton() {
 export default function AdminClubsPage() {
   const [clubs, setClubs] = useState<ClubWithId[]>([]);
   const [loading, setLoading] = useState(true);
+  const { toast } = useToast();
 
   useEffect(() => {
     if (!firestore) {
-      console.error("Firestore is not initialized. Cannot fetch clubs for admin. This usually means your Firebase environment variables are missing or incorrect.");
+      console.warn("Firestore is not initialized. Displaying mock data for admin clubs page.");
+      setClubs(mockAdminClubData);
       setLoading(false);
       return;
     }
@@ -52,7 +91,6 @@ export default function AdminClubsPage() {
     const unsubscribe = onSnapshot(q, (querySnapshot) => {
       const clubList = querySnapshot.docs.map(doc => {
         const data = doc.data();
-        // Ensure announcementExpiresAt is correctly handled (Date or null)
         let announcementExpiresAt = null;
         if (data.announcementExpiresAt) {
             announcementExpiresAt = data.announcementExpiresAt instanceof Timestamp ? data.announcementExpiresAt.toDate() : new Date(data.announcementExpiresAt);
@@ -74,25 +112,36 @@ export default function AdminClubsPage() {
           announcementExpiresAt: announcementExpiresAt,
         } as ClubWithId;
       });
-      setClubs(clubList);
+
+      if (clubList.length === 0) {
+        setClubs(mockAdminClubData); // Use mock data if Firestore returns empty
+        toast({ title: "Sample Data", description: "No live club data found. Displaying sample entries for demonstration.", duration: 5000 });
+      } else {
+        setClubs(clubList);
+      }
       setLoading(false);
     }, (error) => {
-      console.error("Error fetching clubs with real-time listener:", error);
+      console.error("Error fetching clubs for admin:", error);
+      toast({ title: "Error", description: "Could not fetch club data for admin. Displaying sample data.", variant: "destructive" });
+      setClubs(mockAdminClubData); // Use mock data on error
       setLoading(false);
     });
 
     return () => unsubscribe(); 
-  }, []);
+  }, [toast]);
 
   const refreshData = () => {
-    console.log("Data is real-time, manual refresh typically not needed.");
+    // With onSnapshot, manual refresh is less critical but could force re-check if needed.
+    // For mock data, this won't do much unless we re-trigger Firestore check or mock data generation.
+    console.log("Data is real-time or using mocks. Manual refresh trigger invoked.");
+    // Potentially, re-run the effect logic or parts of it if a hard refresh is desired.
   };
 
   return (
     <div className="space-y-6">
       <PageHeader
         title="Manage Nightclubs"
-        description="View, add, edit, or delete nightclub entries. Data updates in real-time."
+        description="View, add, edit, or delete nightclub entries. Data updates in real-time or shows samples if empty."
       >
         <Button asChild>
           <Link href="/admin/clubs/new">
@@ -110,3 +159,4 @@ export default function AdminClubsPage() {
     </div>
   );
 }
+

@@ -14,7 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Icons } from "@/components/icons";
 import type { ClubWithId, Visit } from "@/types";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { firestore } from "@/lib/firebase"; // Assuming you have this
+import { firestore } from "@/lib/firebase"; 
 import { collection, query, where, getDocs, Timestamp } from "firebase/firestore";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription, AlertTitle } from "../ui/alert";
@@ -25,20 +25,56 @@ interface ClubTimelineDialogProps {
   onOpenChange: (isOpen: boolean) => void;
 }
 
-// Placeholder: Function to process visit data into hourly aggregates
+const mockClubHourlyAggregates: Record<string, { name: string; visitors: number }[]> = {
+  'mock-club-1': Array.from({ length: 24 }, (_, i) => {
+    const hour = i.toString().padStart(2, '0') + ":00";
+    let visitors = 0;
+    if (i >= 19 && i <= 23) visitors = Math.floor(Math.random() * 15) + 5; // Evening peak
+    if (i >= 0 && i <= 2) visitors = Math.floor(Math.random() * 10) + 2; // Late night
+    return { name: hour, visitors };
+  }),
+  'mock-club-2': Array.from({ length: 24 }, (_, i) => {
+    const hour = i.toString().padStart(2, '0') + ":00";
+    let visitors = 0;
+    if (i >= 21 && i <= 23) visitors = Math.floor(Math.random() * 25) + 10; // Peak hours
+    if (i >= 0 && i <= 3) visitors = Math.floor(Math.random() * 20) + 8;   // Late peak
+    return { name: hour, visitors };
+  }),
+   'mock-club-4': Array.from({ length: 24 }, (_, i) => { // The Bassment (packed)
+    const hour = i.toString().padStart(2, '0') + ":00";
+    let visitors = 0;
+    if (i >= 22 || i <= 2) visitors = Math.floor(Math.random() * 30) + 20; // Consistently busy late
+    return { name: hour, visitors };
+  }),
+};
+
+
 async function getHourlyVisitData(clubId: string): Promise<{ name: string; visitors: number }[]> {
-  if (!firestore) return [];
+  if (!firestore) {
+    if (mockClubHourlyAggregates[clubId]) {
+      console.log(`Firestore unavailable, using mock hourly aggregates for ${clubId}`);
+      return mockClubHourlyAggregates[clubId];
+    }
+    return [];
+  }
   
   try {
     const visitsRef = collection(firestore, "visits");
-    // Fetch visits for the specific club, possibly for a time range (e.g., last 7 days)
     const sevenDaysAgo = new Date();
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
     const q = query(visitsRef, where("clubId", "==", clubId), where("entryTimestamp", ">=", Timestamp.fromDate(sevenDaysAgo)));
     
     const querySnapshot = await getDocs(q);
-    const visits = querySnapshot.docs.map(doc => doc.data() as Visit);
 
+    if (querySnapshot.empty && mockClubHourlyAggregates[clubId]) {
+      console.log(`No real visits for ${clubId}, using mock hourly aggregates.`);
+      return mockClubHourlyAggregates[clubId];
+    }
+    if (querySnapshot.empty) {
+        return []; // No real data and no mock specifically defined, return empty
+    }
+
+    const visits = querySnapshot.docs.map(doc => doc.data() as Visit);
     const hourlyCounts: { [key: string]: number } = {};
     for (let i = 0; i < 24; i++) {
         hourlyCounts[i.toString().padStart(2, '0') + ":00"] = 0;
@@ -54,11 +90,15 @@ async function getHourlyVisitData(clubId: string): Promise<{ name: string; visit
     
     return Object.entries(hourlyCounts)
         .map(([name, visitors]) => ({ name, visitors }))
-        .sort((a, b) => a.name.localeCompare(b.name)); // Sort by hour
+        .sort((a, b) => a.name.localeCompare(b.name));
 
   } catch (error) {
     console.error("Error fetching visit data for timeline:", error);
-    return []; // Return empty on error
+    if (mockClubHourlyAggregates[clubId]) {
+      console.log(`Error fetching real timeline for ${clubId}, using mock hourly aggregates as fallback.`);
+      return mockClubHourlyAggregates[clubId];
+    }
+    return [];
   }
 }
 
@@ -75,7 +115,7 @@ export function ClubTimelineDialog({ club, isOpen, onOpenChange }: ClubTimelineD
       getHourlyVisitData(club.id)
         .then(data => {
           setTimelineData(data);
-          if (data.length === 0) {
+          if (data.length === 0 && !mockClubHourlyAggregates[club.id]) { // Only set error if no mock is available either
             // setError("No visit data found for the last 7 days to generate a timeline.");
           }
         })
@@ -93,7 +133,7 @@ export function ClubTimelineDialog({ club, isOpen, onOpenChange }: ClubTimelineD
         <DialogHeader>
           <DialogTitle>Average Crowd Timeline for {club.name}</DialogTitle>
           <DialogDescription>
-            Typical crowd flow based on entries in the last 7 days. (Updates may take a moment)
+            Typical crowd flow based on entries in the last 7 days (real or sample data).
           </DialogDescription>
         </DialogHeader>
         <div className="py-4 h-[300px] w-full">
