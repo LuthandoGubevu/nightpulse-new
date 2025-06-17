@@ -108,9 +108,9 @@ function DashboardLoadingSkeleton() {
       <div className="mt-6 space-y-4">
         <div className="flex flex-col md:flex-row md:items-center gap-4">
             <Skeleton className="h-10 w-full md:w-auto" /> {/* Location button */}
-            <div className="grid grid-cols-2 md:flex md:flex-row gap-2"> {/* Filter selects */}
-                <Skeleton className="h-10 w-full md:w-32" />
-                <Skeleton className="h-10 w-full md:w-32" />
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:flex md:flex-row gap-2 w-full md:w-auto"> {/* Filter selects */}
+                <Skeleton className="h-10 w-full" />
+                <Skeleton className="h-10 w-full" />
             </div>
         </div>
         <div className="grid w-full grid-cols-2 md:w-96">
@@ -316,14 +316,20 @@ export default function DashboardPage() {
         description="Find real-time crowd levels, wait times, and vibes for nightclubs."
       />
 
-      <div className="my-6 space-y-4 md:space-y-0 md:flex md:items-center md:justify-between md:gap-4">
-        <Button onClick={handleGetUserLocation} disabled={locationLoading} variant="outline">
+      <div className="my-6 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <Button 
+          onClick={handleGetUserLocation} 
+          disabled={locationLoading} 
+          variant="outline"
+          className="w-full md:w-auto"
+        >
           {locationLoading ? <Icons.spinner className="mr-2 h-4 w-4 animate-spin" /> : <Icons.navigation className="mr-2 h-4 w-4" />}
           {userLocation ? "Update My Location" : "Use My Location"}
         </Button>
-        <div className="flex flex-col sm:flex-row gap-2">
+        
+        <div className="flex flex-col sm:flex-row gap-2 w-full md:w-auto"> 
           <Select value={sortBy} onValueChange={handleSortChange}>
-            <SelectTrigger className="w-full sm:w-[180px]">
+            <SelectTrigger className="w-full">
               <SelectValue placeholder="Sort by..." />
             </SelectTrigger>
             <SelectContent>
@@ -333,7 +339,7 @@ export default function DashboardPage() {
             </SelectContent>
           </Select>
           <Select value={filterTags[0] || "all"} onValueChange={handleFilterChange}>
-            <SelectTrigger className="w-full sm:w-[180px]">
+            <SelectTrigger className="w-full">
               <SelectValue placeholder="Filter by..." />
             </SelectTrigger>
             <SelectContent>
