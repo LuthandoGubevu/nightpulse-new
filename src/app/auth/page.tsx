@@ -15,7 +15,7 @@ export default function AuthPage() {
           className="text-center"
         />
         <Alert>
-            <Icons.info className="h-4 w-4" />
+            <Icons.warning className="h-4 w-4" />
             <AlertTitle>Information</AlertTitle>
             <AlertDescription>
                 This page is no longer active as authentication has been removed.
