@@ -43,6 +43,7 @@ import {
   TrendingUp, // Added for trends
   UsersRound, // Alternative for Users, if needed
   LayoutDashboard, // Added for dashboard icon
+  Check, // Added Check icon
 } from "lucide-react"
 
 // A simple Google icon SVG as lucide-react doesn't have one directly
@@ -103,4 +104,6 @@ export const Icons = {
   trendingUp: TrendingUp,
   usersRound: UsersRound,
   layoutDashboard: LayoutDashboard,
+  check: Check, // Added Check icon export
 }
+
