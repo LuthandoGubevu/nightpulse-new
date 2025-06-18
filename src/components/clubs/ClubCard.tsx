@@ -11,10 +11,10 @@ import { getClubStatus } from "@/lib/utils";
 import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { ClubTimelineDialog } from "./ClubTimelineDialog"; 
-import { Timestamp } from "firebase/firestore";
+import type { Timestamp } from "firebase/firestore"; // Keep type import if used
 
 interface ClubCardProps {
-  club: ClubWithId; // currentCount here will be the live count from dashboard
+  club: ClubWithId; 
 }
 
 export function ClubCard({ club }: ClubCardProps) {
@@ -69,7 +69,6 @@ export function ClubCard({ club }: ClubCardProps) {
 
           <div className="flex items-baseline space-x-2">
             <Icons.users className="h-5 w-5 text-primary" />
-            {/* Display the live crowd count passed in club.currentCount */}
             <span className="text-lg font-semibold">{club.currentCount}</span> 
             <span className="text-sm text-muted-foreground">people (live)</span>
             <span className="text-sm font-medium">{statusTextMap[status]}</span>
@@ -110,7 +109,8 @@ export function ClubCard({ club }: ClubCardProps) {
             </div>
           )}
         </CardContent>
-        <CardFooter className="p-4 border-t grid grid-cols-1 sm:grid-cols-2 gap-2">
+        <CardFooter className="p-4 border-t">
+           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 w-full">
             <Button onClick={() => setIsWaitTimeDialogOpen(true)} variant="outline" className="w-full">
               <Icons.clock className="mr-2 h-4 w-4" />
               AI Wait Time
@@ -119,6 +119,7 @@ export function ClubCard({ club }: ClubCardProps) {
               <Icons.barChartBig className="mr-2 h-4 w-4" />
               Crowd Timeline
             </Button>
+          </div>
         </CardFooter>
       </Card>
 
@@ -131,7 +132,7 @@ export function ClubCard({ club }: ClubCardProps) {
       )}
       {isTimelineDialogOpen && (
         <ClubTimelineDialog 
-          club={club} // This club object now has the live currentCount
+          club={club}
           isOpen={isTimelineDialogOpen}
           onOpenChange={setIsTimelineDialogOpen}
         />

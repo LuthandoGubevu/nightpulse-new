@@ -1,7 +1,7 @@
 
 "use client"; 
 
-import React, { useEffect, useState, useMemo, useCallback } from "react";
+import React, { useEffect, useState, useMemo, useCallback, useRef } from "react";
 import { collection, onSnapshot, orderBy, query, Timestamp } from "firebase/firestore";
 import { firestore } from "@/lib/firebase";
 import type { ClubWithId, UserLocation } from "@/types";
@@ -20,7 +20,7 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { useGeofenceAutoCheckin } from "@/hooks/useGeofenceAutoCheckin";
 import { useHeartbeatTracker } from "@/hooks/useHeartbeatTracker";
-import { getLiveClubCounts } from "@/actions/clubActions"; // Server action to get live counts
+import { getLiveClubCounts } from "@/actions/clubActions"; 
 
 const mockClubData: ClubWithId[] = [
   {
@@ -28,10 +28,11 @@ const mockClubData: ClubWithId[] = [
     name: 'Sanctuary Mandela',
     address: '4 9th St, Houghton Estate, Johannesburg, 2198',
     location: { lat: -26.1738, lng: 28.0549 },
-    currentCount: 0, // Base count, will be overridden by live count
+    currentCount: 0, 
     capacityThresholds: { low: 50, moderate: 100, packed: 150 },
     lastUpdated: new Date().toISOString(),
     imageUrl: 'https://placehold.co/600x400.png',
+    data_ai_hint: 'upscale lounge',
     estimatedWaitTime: '5-10 min',
     tags: ['upscale', 'chill', 'cocktails'],
     musicGenres: ['Jazz', 'Soul', 'Lounge'],
@@ -50,6 +51,7 @@ const mockClubData: ClubWithId[] = [
     capacityThresholds: { low: 60, moderate: 120, packed: 180 },
     lastUpdated: new Date(Date.now() - 15 * 60 * 1000).toISOString(), 
     imageUrl: 'https://placehold.co/600x400.png',
+    data_ai_hint: 'electronic dance',
     estimatedWaitTime: '20-30 min',
     tags: ['electronic', 'dance floor', 'underground'],
     musicGenres: ['Techno', 'House', 'Trance'],
@@ -68,6 +70,7 @@ const mockClubData: ClubWithId[] = [
     capacityThresholds: { low: 30, moderate: 70, packed: 100 },
     lastUpdated: new Date(Date.now() - 60 * 60 * 1000).toISOString(),
     imageUrl: 'https://placehold.co/600x400.png',
+    data_ai_hint: 'jazz dinner',
     tags: ['live jazz', 'dinner', 'vintage'],
     musicGenres: ['Jazz', 'Blues', 'Swing'],
     tonightDJ: '',
@@ -85,6 +88,7 @@ const mockClubData: ClubWithId[] = [
     capacityThresholds: { low: 50, moderate: 100, packed: 150 },
     lastUpdated: new Date(Date.now() - 5 * 60 * 1000).toISOString(), 
     imageUrl: 'https://placehold.co/600x400.png',
+    data_ai_hint: 'techno underground',
     estimatedWaitTime: '45+ min (At Capacity)',
     tags: ['techno', 'underground', 'late night'],
     musicGenres: ['Techno', 'Minimal', 'Deep House'],
@@ -147,12 +151,14 @@ export default function DashboardPage() {
   const [locationLoading, setLocationLoading] = useState(false);
   const [sortBy, setSortBy] = useState<string>("default"); 
   const [filterTags, setFilterTags] = useState<string[]>([]); 
-  const [isAutoCheckInEnabled, setIsAutoCheckInEnabled] = useState(false);
+  
+  const [isAutoPresenceEnabled, setIsAutoPresenceEnabled] = useState(false);
+  const [activeGeofenceClubId, setActiveGeofenceClubId] = useState<string | null>(null);
+  
   const [liveClubCounts, setLiveClubCounts] = useState<Record<string, number>>({});
   const [pollingLocationForGeofence, setPollingLocationForGeofence] = useState(false);
 
 
-  // Fetch base club data
   useEffect(() => {
     if (!firestore) { 
       console.warn("Firestore is not initialized. Displaying mock data for dashboard.");
@@ -177,10 +183,11 @@ export default function DashboardPage() {
           name: data.name || "Unnamed Club",
           address: data.address || "No address",
           location: data.location || null,
-          currentCount: data.currentCount || 0, // This is the admin-set base count
+          currentCount: data.currentCount || 0, 
           capacityThresholds: data.capacityThresholds || { low: 50, moderate: 100, packed: 150 },
           lastUpdated: data.lastUpdated instanceof Timestamp ? data.lastUpdated.toDate().toISOString() : new Date().toISOString(),
           imageUrl: data.imageUrl || `https://placehold.co/600x400.png`,
+          data_ai_hint: data.data_ai_hint || (data.name ? data.name.toLowerCase().split(" ").slice(0,2).join(" ") : "nightclub"),
           estimatedWaitTime: data.estimatedWaitTime,
           tags: data.tags || [],
           musicGenres: data.musicGenres || [],
@@ -204,40 +211,44 @@ export default function DashboardPage() {
       setLoadingClubs(false);
     });
     return () => unsubscribe();
-  }, [toast, liveClubCounts]); // Added liveClubCounts to re-evaluate trending status
+  }, [toast, liveClubCounts]);
 
-  // Fetch live club counts
   const fetchLiveCounts = useCallback(async () => {
     try {
       const counts = await getLiveClubCounts();
       setLiveClubCounts(counts);
     } catch (error) {
       console.error("Failed to fetch live club counts:", error);
-      // Optionally, show a toast for this error, but it might be noisy if it happens often
     }
   }, []);
 
   useEffect(() => {
-    fetchLiveCounts(); // Fetch on initial load
-    const interval = setInterval(fetchLiveCounts, 1 * 60 * 1000); // Fetch every 1 minute
+    fetchLiveCounts(); 
+    const interval = setInterval(fetchLiveCounts, 1 * 60 * 1000); 
     return () => clearInterval(interval);
   }, [fetchLiveCounts]);
 
-  const { closestClubInGeofence, locationError: geofenceLocationError } = useGeofenceAutoCheckin({
+  const handleGeofenceChange = useCallback((clubId: string | null) => {
+    // console.log('Dashboard: Geofence changed to club ID:', clubId);
+    setActiveGeofenceClubId(clubId);
+  }, []);
+  
+  const { locationError: geofenceLocationError } = useGeofenceAutoCheckin({
     clubs: allClubs,
-    isEnabled: isAutoCheckInEnabled && pollingLocationForGeofence, // Geofence only active if user location is being polled
-    userLocation: userLocation, // Pass userLocation to the geofence hook
+    isEnabled: isAutoPresenceEnabled && pollingLocationForGeofence, 
+    userLocation: userLocation,
+    onGeofenceChange: handleGeofenceChange,
   });
   
   useHeartbeatTracker({
-    clubId: closestClubInGeofence?.id || null,
+    clubId: activeGeofenceClubId, // Use the ID from geofence hook
     userLocation: userLocation,
-    isEnabled: isAutoCheckInEnabled && !!closestClubInGeofence, // Heartbeat only active if in a club geofence and enabled
+    isEnabled: isAutoPresenceEnabled && !!activeGeofenceClubId, 
   });
   
   useEffect(() => {
     if (geofenceLocationError) {
-      toast({ variant: 'destructive', title: 'Auto Check-In Location Issue', description: geofenceLocationError });
+      toast({ variant: 'destructive', title: 'Auto Presence Location Issue', description: geofenceLocationError });
     }
   }, [geofenceLocationError, toast]);
 
@@ -246,24 +257,25 @@ export default function DashboardPage() {
   const startLocationPolling = useCallback(() => {
     if (navigator.geolocation && !watchIdRef.current) {
       setPollingLocationForGeofence(true);
-      setLocationLoading(true);
+      setLocationLoading(true); // Indicate loading when starting watch
       watchIdRef.current = navigator.geolocation.watchPosition(
         (position) => {
           setUserLocation({ lat: position.coords.latitude, lng: position.coords.longitude });
-          setLocationLoading(false);
+          setLocationLoading(false); // Stop loading indicator once first position is received
         },
         (error) => {
           console.error("Error watching user location:", error);
           toast({ title: "Location Watch Error", description: `Could not watch your location: ${error.message}. Auto features may be limited.`, variant: "destructive" });
           setLocationLoading(false);
           setPollingLocationForGeofence(false);
-          // If watch fails, stop it
           if (watchIdRef.current) navigator.geolocation.clearWatch(watchIdRef.current);
           watchIdRef.current = null;
+          // If watching fails, also disable auto-presence to prevent inconsistent state
+          setIsAutoPresenceEnabled(false);
         },
-        { enableHighAccuracy: true, maximumAge: 10000, timeout: 15000, distanceFilter: 10 } // Distance filter for watch
+        { enableHighAccuracy: true, maximumAge: 10000, timeout: 15000, distanceFilter: 10 }
       );
-      toast({ title: "Location Tracking Started", description: "App will now monitor your location for auto check-in." });
+      toast({ title: "Location Tracking Started", description: "App will now monitor your location for auto-presence." });
     }
   }, [toast]);
 
@@ -273,8 +285,8 @@ export default function DashboardPage() {
       watchIdRef.current = null;
     }
     setPollingLocationForGeofence(false);
-    // setUserLocation(null); // Optionally clear location when polling stops
-    toast({ title: "Location Tracking Stopped", description: "Auto check-in features are now paused." });
+    // setUserLocation(null); // Optionally clear location, or keep last known for sorting
+    toast({ title: "Location Tracking Stopped", description: "Auto-presence features are now paused." });
   }, [toast]);
 
   const handleGetUserLocationOnce = () => {
@@ -285,9 +297,8 @@ export default function DashboardPage() {
           setUserLocation({ lat: position.coords.latitude, lng: position.coords.longitude });
           setLocationLoading(false);
           setSortBy("nearby");
-          toast({ title: "Location Found", description: "Sorting clubs by your location. You can now enable Auto Check-In." });
-          // If not already polling, start polling after the first manual location get for auto check-in
-          if (isAutoCheckInEnabled && !pollingLocationForGeofence) {
+          toast({ title: "Location Found", description: "Sorting clubs by your location. You can now enable Auto Presence." });
+          if (isAutoPresenceEnabled && !pollingLocationForGeofence) {
              startLocationPolling();
           }
         },
@@ -305,7 +316,7 @@ export default function DashboardPage() {
   const clubsWithLiveCountsAndDistance = useMemo(() => {
     let clubsToProcess = allClubs.map(club => ({
       ...club,
-      currentCount: liveClubCounts[club.id] ?? club.currentCount ?? 0, // Prioritize live count, fallback to club's own currentCount (admin set), then 0
+      currentCount: liveClubCounts[club.id] ?? club.currentCount ?? 0, 
       isTrending: getClubStatus(liveClubCounts[club.id] ?? club.currentCount ?? 0, club.capacityThresholds || {}) === 'packed' || getClubStatus(liveClubCounts[club.id] ?? club.currentCount ?? 0, club.capacityThresholds || {}) === 'over-packed',
       distance: userLocation && club.location ? haversineDistance(userLocation.lat, userLocation.lng, club.location.lat, club.location.lng) : Infinity,
     }));
@@ -323,7 +334,7 @@ export default function DashboardPage() {
          clubsToProcess.sort((a, b) => (a.distance ?? Infinity) - (b.distance ?? Infinity));
     } else if (sortBy === "crowded") { 
         clubsToProcess.sort((a,b) => (b.currentCount || 0) - (a.currentCount || 0));
-    } else { // default
+    } else { 
         clubsToProcess.sort((a,b) => a.name.localeCompare(b.name));
     }
     return clubsToProcess;
@@ -342,21 +353,25 @@ export default function DashboardPage() {
     setFilterTags(value === "all" ? [] : [value]);
   };
 
-  const handleAutoCheckInToggle = (checked: boolean) => {
+  const handleAutoPresenceToggle = (checked: boolean) => {
     if (checked && !userLocation) {
-      toast({ title: "Location Needed", description: "Please 'Use My Location' first to enable auto check-in.", variant: "default" });
-      setIsAutoCheckInEnabled(false); // Ensure switch reflects false state
+      toast({ title: "Location Needed", description: "Please 'Use My Location' first to enable Auto Presence.", variant: "default" });
+      setIsAutoPresenceEnabled(false); 
       return;
     }
-    setIsAutoCheckInEnabled(checked);
+    setIsAutoPresenceEnabled(checked);
     if (checked) {
       startLocationPolling();
     } else {
       stopLocationPolling();
+      // When disabling, ensure we also clear the geofence state from this hook's perspective
+      // The geofence hook itself will also clear its internal state and call onGeofenceChange(null)
+      // if (activeGeofenceClubId) {
+      //   setActiveGeofenceClubId(null); // This will ensure heartbeat stops
+      // }
     }
   };
 
-  // Effect to stop polling if component unmounts
   useEffect(() => {
     return () => {
       if (watchIdRef.current && navigator.geolocation) {
@@ -413,12 +428,12 @@ export default function DashboardPage() {
         </div>
         <div className="flex items-center space-x-2 w-full md:w-auto justify-start md:justify-end">
           <Switch
-            id="auto-checkin-toggle"
-            checked={isAutoCheckInEnabled}
-            onCheckedChange={handleAutoCheckInToggle}
-            disabled={!userLocation && !isAutoCheckInEnabled} // Disable if no location or not explicitly enabled after location
+            id="auto-presence-toggle"
+            checked={isAutoPresenceEnabled}
+            onCheckedChange={handleAutoPresenceToggle}
+            disabled={!userLocation && !isAutoPresenceEnabled} 
           />
-          <Label htmlFor="auto-checkin-toggle" className={(!userLocation && !isAutoCheckInEnabled) ? 'text-muted-foreground' : ''}>
+          <Label htmlFor="auto-presence-toggle" className={(!userLocation && !isAutoPresenceEnabled) ? 'text-muted-foreground' : ''}>
             Auto Presence
           </Label>
         </div>
