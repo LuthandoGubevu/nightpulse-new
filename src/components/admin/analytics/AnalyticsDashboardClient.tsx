@@ -117,7 +117,6 @@ export function AnalyticsDashboardClient() {
         setActiveClubs(activeCount);
       }).catch(err => {
         console.error("Error fetching live counts for active clubs metric:", err);
-        // Potentially set activeClubs to a fallback or show an error indicator
       });
       
       setTotalClubs(snapshot.docs.length);
@@ -138,7 +137,6 @@ export function AnalyticsDashboardClient() {
       let heartbeatsToProcess: HeartbeatEntryWithDeviceId[] = [];
 
       if (!firestore) {
-        console.warn("Firestore unavailable for analytics. Analytics will be empty.");
         setHourlyData([]);
         setBusiestDayData([]);
         setVisitMetrics({ avgDuration: "N/A", newVsReturning: { new: 0, returning: 0 }});
@@ -157,7 +155,7 @@ export function AnalyticsDashboardClient() {
 
         const snapshot = await getDocs(heartbeatsQuery);
         if (snapshot.empty) {
-          console.log("No heartbeat data found in Firestore for analytics in the last 30 days.");
+          // No error, just no data
         } else {
           heartbeatsToProcess = snapshot.docs.map(doc => ({
              ...(doc.data() as HeartbeatEntry), 
