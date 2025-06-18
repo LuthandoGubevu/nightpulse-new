@@ -2,33 +2,31 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import type { ClubWithId } from '@/types';
+import type { ClubWithId, UserLocation } from '@/types';
 import { getDistanceMeters } from '@/lib/utils';
-import { incrementClubCountAction, decrementClubCountAction } from '@/actions/visitActions';
 import { useToast } from './use-toast';
 
-const GEOFENCE_RADIUS_METERS = 50;
-const LOCAL_STORAGE_AUTO_CHECKIN_KEY = 'nightpulse_auto_checked_in_club_id';
+const GEOFENCE_RADIUS_METERS = 50; // Radius for considering a user "at" a club
 
 interface UseGeofenceAutoCheckinProps {
   clubs: ClubWithId[];
-  isEnabled: boolean;
+  isEnabled: boolean; // Is the auto check-in system globally enabled by the user
+  userLocation: UserLocation | null; // Current user location from dashboard
 }
 
-export function useGeofenceAutoCheckin({ clubs, isEnabled }: UseGeofenceAutoCheckinProps) {
+interface UseGeofenceAutoCheckinReturn {
+  closestClubInGeofence: ClubWithId | null;
+  locationError: string | null;
+}
+
+export function useGeofenceAutoCheckin({ clubs, isEnabled, userLocation }: UseGeofenceAutoCheckinProps): UseGeofenceAutoCheckinReturn {
   const { toast } = useToast();
-  const [currentlyAutoCheckedInClubId, setCurrentlyAutoCheckedInClubId] = useState<string | null>(null);
+  const [closestClubInGeofence, setClosestClubInGeofence] = useState<ClubWithId | null>(null);
   const [locationError, setLocationError] = useState<string | null>(null);
-  const watchIdRef = useRef<number | null>(null);
+  const previousClosestClubIdRef = useRef<string | null>(null);
 
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      setCurrentlyAutoCheckedInClubId(localStorage.getItem(LOCAL_STORAGE_AUTO_CHECKIN_KEY));
-    }
-  }, []);
-
-  const processGeofenceEvent = useCallback(async (latitude: number, longitude: number) => {
-    let closestClubInGeofence: ClubWithId | null = null;
+  const findClosestClubInGeofence = useCallback((latitude: number, longitude: number) => {
+    let newClosestClub: ClubWithId | null = null;
     let minDistance = Infinity;
 
     for (const club of clubs) {
@@ -37,88 +35,43 @@ export function useGeofenceAutoCheckin({ clubs, isEnabled }: UseGeofenceAutoChec
       if (distance <= GEOFENCE_RADIUS_METERS) {
         if (distance < minDistance) {
           minDistance = distance;
-          closestClubInGeofence = club;
+          newClosestClub = club;
         }
       }
     }
+    
+    if (newClosestClub?.id !== previousClosestClubIdRef.current) {
+        if (newClosestClub) {
+            toast({ title: "Near Club", description: `You are now near ${newClosestClub.name}. Heartbeats will be sent.`});
+        } else if (previousClosestClubIdRef.current) {
+            const oldClub = clubs.find(c => c.id === previousClosestClubIdRef.current);
+            toast({ title: "Left Club Area", description: `You've left the vicinity of ${oldClub?.name || 'the club'}. Heartbeats stopped for this club.` });
+        }
+        previousClosestClubIdRef.current = newClosestClub?.id || null;
+    }
+    setClosestClubInGeofence(newClosestClub);
 
-    if (closestClubInGeofence) {
-      if (currentlyAutoCheckedInClubId !== closestClubInGeofence.id) {
-        if (currentlyAutoCheckedInClubId) {
-          const oldClub = clubs.find(c => c.id === currentlyAutoCheckedInClubId);
-          await decrementClubCountAction(currentlyAutoCheckedInClubId);
-          toast({ variant: 'default', title: "Auto Check-Out", description: `You've left the vicinity of ${oldClub?.name || 'the previous club'}.` });
-        }
-        await incrementClubCountAction(closestClubInGeofence.id);
-        localStorage.setItem(LOCAL_STORAGE_AUTO_CHECKIN_KEY, closestClubInGeofence.id);
-        setCurrentlyAutoCheckedInClubId(closestClubInGeofence.id);
-        toast({ variant: 'default', title: "Auto Check-In", description: `Welcome to ${closestClubInGeofence.name}! You've been automatically checked in.` });
-      }
-    } else {
-      if (currentlyAutoCheckedInClubId) {
-        const oldClub = clubs.find(c => c.id === currentlyAutoCheckedInClubId);
-        await decrementClubCountAction(currentlyAutoCheckedInClubId);
-        localStorage.removeItem(LOCAL_STORAGE_AUTO_CHECKIN_KEY);
-        setCurrentlyAutoCheckedInClubId(null);
-        toast({ variant: 'default', title: "Auto Check-Out", description: `You've left the vicinity of ${oldClub?.name || 'the club'}.` });
-      }
-    }
-  }, [clubs, currentlyAutoCheckedInClubId, toast]);
+  }, [clubs, toast]);
 
 
   useEffect(() => {
-    if (isEnabled && typeof navigator !== 'undefined' && navigator.geolocation) {
-      navigator.permissions.query({ name: 'geolocation' }).then(permissionStatus => {
-        if (permissionStatus.state === 'granted' || permissionStatus.state === 'prompt') {
-          watchIdRef.current = navigator.geolocation.watchPosition(
-            (position) => {
-              setLocationError(null);
-              processGeofenceEvent(position.coords.latitude, position.coords.longitude);
-            },
-            (error) => {
-              console.error("Error watching location:", error);
-              setLocationError(`Location error: ${error.message}. Auto check-in may not work.`);
-              toast({ variant: "destructive", title: "Location Error", description: "Could not get location for auto check-in." });
-            },
-            { enableHighAccuracy: true, maximumAge: 10000, timeout: 15000, distanceFilter: 5 }
-          );
-        } else if (permissionStatus.state === 'denied') {
-          setLocationError("Location permission denied. Enable location services for auto check-in.");
-          toast({ variant: "destructive", title: "Permission Denied", description: "Location access is needed for auto check-in."});
-        }
-        permissionStatus.onchange = () => {
-           if (permissionStatus.state === 'denied' && watchIdRef.current !== null) {
-            navigator.geolocation.clearWatch(watchIdRef.current);
-            watchIdRef.current = null;
-            setLocationError("Location permission was denied. Auto check-in stopped.");
-          }
-        };
-      });
-
-      return () => {
-        if (watchIdRef.current !== null) {
-          navigator.geolocation.clearWatch(watchIdRef.current);
-          watchIdRef.current = null;
-        }
-      };
-    } else {
-      if (watchIdRef.current !== null) {
-        navigator.geolocation.clearWatch(watchIdRef.current);
-        watchIdRef.current = null;
+    if (isEnabled && userLocation) {
+      setLocationError(null);
+      findClosestClubInGeofence(userLocation.lat, userLocation.lng);
+    } else if (!isEnabled) {
+      // If feature is disabled, clear the current geofenced club
+      if (closestClubInGeofence) {
+        // Optionally notify user they are no longer "actively" tracked for heartbeat for this club
+        // toast({ title: "Auto Presence Disabled", description: `Stopped sending heartbeats for ${closestClubInGeofence.name}.` });
       }
-      // If feature is disabled and user was auto-checked in, check them out
-      if (!isEnabled && currentlyAutoCheckedInClubId && typeof window !== 'undefined') {
-         const checkOutAsync = async () => {
-            const oldClub = clubs.find(c => c.id === currentlyAutoCheckedInClubId);
-            await decrementClubCountAction(currentlyAutoCheckedInClubId);
-            localStorage.removeItem(LOCAL_STORAGE_AUTO_CHECKIN_KEY);
-            setCurrentlyAutoCheckedInClubId(null);
-            toast({ title: "Auto Check-In Disabled", description: `You've been checked out from ${oldClub?.name || 'the club'}.` });
-        };
-        checkOutAsync();
-      }
+      setClosestClubInGeofence(null);
+      previousClosestClubIdRef.current = null;
     }
-  }, [isEnabled, processGeofenceEvent, toast, clubs, currentlyAutoCheckedInClubId]);
+    // Not including findClosestClubInGeofence in deps to avoid re-running if only clubs/toast changes
+    // It's primarily driven by isEnabled and userLocation changes.
+  }, [isEnabled, userLocation, clubs, toast]); // Added clubs and toast, findClosestClubInGeofence will be stable if memoized correctly
 
-  return { locationError, autoCheckedInClubId: currentlyAutoCheckedInClubId };
+  // This hook now primarily returns the club the user is in the geofence of.
+  // The actual heartbeat sending is handled by useHeartbeatTracker.
+  return { closestClubInGeofence, locationError };
 }

@@ -1,9 +1,8 @@
 
 "use client"; 
 
-import React, { useEffect, useState, useMemo } from "react";
-// import { useRouter } from "next/navigation"; // No longer needed for auth redirection
-import { collection, getDocs, orderBy, query, Timestamp, onSnapshot } from "firebase/firestore";
+import React, { useEffect, useState, useMemo, useCallback } from "react";
+import { collection, onSnapshot, orderBy, query, Timestamp } from "firebase/firestore";
 import { firestore } from "@/lib/firebase";
 import type { ClubWithId, UserLocation } from "@/types";
 import { ClubList } from "@/components/clubs/ClubList";
@@ -11,7 +10,6 @@ import { PageHeader } from "@/components/common/PageHeader";
 import ClubMapWrapper from "@/components/clubs/ClubMapWrapper";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Icons } from "@/components/icons";
-// import { useAuth } from "@/hooks/useAuth"; // No longer needed for auth redirection
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -21,18 +19,19 @@ import { useToast } from "@/hooks/use-toast";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { useGeofenceAutoCheckin } from "@/hooks/useGeofenceAutoCheckin";
+import { useHeartbeatTracker } from "@/hooks/useHeartbeatTracker";
+import { getLiveClubCounts } from "@/actions/clubActions"; // Server action to get live counts
 
 const mockClubData: ClubWithId[] = [
   {
     id: 'mock-club-1',
-    name: 'Sanctuary Mandela', // Example name
+    name: 'Sanctuary Mandela',
     address: '4 9th St, Houghton Estate, Johannesburg, 2198',
-    location: { lat: -26.1738, lng: 28.0549 }, // Approx. Houghton Estate
-    currentCount: 75,
+    location: { lat: -26.1738, lng: 28.0549 },
+    currentCount: 0, // Base count, will be overridden by live count
     capacityThresholds: { low: 50, moderate: 100, packed: 150 },
     lastUpdated: new Date().toISOString(),
     imageUrl: 'https://placehold.co/600x400.png',
-    // data-ai-hint will be on the Image component itself in ClubCard
     estimatedWaitTime: '5-10 min',
     tags: ['upscale', 'chill', 'cocktails'],
     musicGenres: ['Jazz', 'Soul', 'Lounge'],
@@ -44,10 +43,10 @@ const mockClubData: ClubWithId[] = [
   },
   {
     id: 'mock-club-2',
-    name: 'Truth Nightclub', // Example name
-    address: 'Old Pretoria Rd, Halfway House, Midrand, 1685', // Midrand area
-    location: { lat: -26.0000, lng: 28.1260 }, // Approx. Midrand
-    currentCount: 160,
+    name: 'Truth Nightclub',
+    address: 'Old Pretoria Rd, Halfway House, Midrand, 1685',
+    location: { lat: -26.0000, lng: 28.1260 },
+    currentCount: 0,
     capacityThresholds: { low: 60, moderate: 120, packed: 180 },
     lastUpdated: new Date(Date.now() - 15 * 60 * 1000).toISOString(), 
     imageUrl: 'https://placehold.co/600x400.png',
@@ -60,12 +59,12 @@ const mockClubData: ClubWithId[] = [
     isTrending: true,
     distance: 15.1,
   },
-  {
+   {
     id: 'mock-club-3',
-    name: 'The Marabi Club', // Example name
+    name: 'The Marabi Club', 
     address: '47 Sivewright Ave, New Doornfontein, Johannesburg, 2094',
-    location: { lat: -26.1995, lng: 28.0565 }, // Approx. Maboneng/New Doornfontein
-    currentCount: 40,
+    location: { lat: -26.1995, lng: 28.0565 }, 
+    currentCount: 0,
     capacityThresholds: { low: 30, moderate: 70, packed: 100 },
     lastUpdated: new Date(Date.now() - 60 * 60 * 1000).toISOString(),
     imageUrl: 'https://placehold.co/600x400.png',
@@ -79,10 +78,10 @@ const mockClubData: ClubWithId[] = [
   },
     {
     id: 'mock-club-4',
-    name: 'And Club', // Example name
+    name: 'And Club', 
     address: '39a Gwi Gwi Mrwebi St, Newtown, Johannesburg, 2113',
-    location: { lat: -26.2044, lng: 28.0353 }, // Approx. Newtown
-    currentCount: 220, 
+    location: { lat: -26.2044, lng: 28.0353 }, 
+    currentCount: 0, 
     capacityThresholds: { low: 50, moderate: 100, packed: 150 },
     lastUpdated: new Date(Date.now() - 5 * 60 * 1000).toISOString(), 
     imageUrl: 'https://placehold.co/600x400.png',
@@ -110,12 +109,12 @@ function DashboardLoadingSkeleton() {
       />
       <div className="mt-6 space-y-4">
         <div className="flex flex-col md:flex-row md:items-center gap-4">
-            <Skeleton className="h-10 w-full md:w-auto" /> {}
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:flex md:flex-row gap-2 w-full md:w-auto"> {}
+            <Skeleton className="h-10 w-full md:w-auto" />
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:flex md:flex-row gap-2 w-full md:w-auto">
                 <Skeleton className="h-10 w-full" />
                 <Skeleton className="h-10 w-full" />
             </div>
-            <Skeleton className="h-10 w-32" /> {}
+            <Skeleton className="h-10 w-32" />
         </div>
         <div className="grid w-full grid-cols-2 md:w-96">
           <Skeleton className="h-10" />
@@ -124,7 +123,6 @@ function DashboardLoadingSkeleton() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {[...Array(3)].map((_, i) => (
             <Card key={i} className="flex flex-col overflow-hidden">
-              
               <CardContent className="p-6 flex-grow space-y-2">
                 <Skeleton className="h-6 w-3/4" />
                 <Skeleton className="h-4 w-full" />
@@ -142,32 +140,19 @@ function DashboardLoadingSkeleton() {
 }
 
 export default function DashboardPage() {
-  
   const { toast } = useToast();
-
   const [allClubs, setAllClubs] = useState<ClubWithId[]>([]);
-  const [displayedClubs, setDisplayedClubs] = useState<ClubWithId[]>([]);
   const [loadingClubs, setLoadingClubs] = useState(true);
-  
   const [userLocation, setUserLocation] = useState<UserLocation | null>(null);
   const [locationLoading, setLocationLoading] = useState(false);
-  
   const [sortBy, setSortBy] = useState<string>("default"); 
   const [filterTags, setFilterTags] = useState<string[]>([]); 
   const [isAutoCheckInEnabled, setIsAutoCheckInEnabled] = useState(false);
-
-  const { locationError: geofenceError, autoCheckedInClubId } = useGeofenceAutoCheckin({
-    clubs: allClubs,
-    isEnabled: isAutoCheckInEnabled,
-  });
-
-  useEffect(() => {
-    if (geofenceError) {
-      toast({ variant: 'destructive', title: 'Auto Check-In Issue', description: geofenceError });
-    }
-  }, [geofenceError, toast]);
+  const [liveClubCounts, setLiveClubCounts] = useState<Record<string, number>>({});
+  const [pollingLocationForGeofence, setPollingLocationForGeofence] = useState(false);
 
 
+  // Fetch base club data
   useEffect(() => {
     if (!firestore) { 
       console.warn("Firestore is not initialized. Displaying mock data for dashboard.");
@@ -187,13 +172,12 @@ export default function DashboardPage() {
         if (data.announcementExpiresAt) {
             announcementExpiresAt = data.announcementExpiresAt instanceof Timestamp ? data.announcementExpiresAt.toDate() : new Date(data.announcementExpiresAt);
         }
-
         return {
           id: doc.id,
           name: data.name || "Unnamed Club",
           address: data.address || "No address",
           location: data.location || null,
-          currentCount: data.currentCount || 0,
+          currentCount: data.currentCount || 0, // This is the admin-set base count
           capacityThresholds: data.capacityThresholds || { low: 50, moderate: 100, packed: 150 },
           lastUpdated: data.lastUpdated instanceof Timestamp ? data.lastUpdated.toDate().toISOString() : new Date().toISOString(),
           imageUrl: data.imageUrl || `https://placehold.co/600x400.png`,
@@ -203,7 +187,7 @@ export default function DashboardPage() {
           tonightDJ: data.tonightDJ,
           announcementMessage: data.announcementMessage,
           announcementExpiresAt: announcementExpiresAt,
-          isTrending: getClubStatus(data.currentCount || 0, data.capacityThresholds || {}) === 'packed' || getClubStatus(data.currentCount || 0, data.capacityThresholds || {}) === 'over-packed',
+          isTrending: getClubStatus(liveClubCounts[doc.id] ?? data.currentCount ?? 0, data.capacityThresholds || {}) === 'packed' || getClubStatus(liveClubCounts[doc.id] ?? data.currentCount ?? 0, data.capacityThresholds || {}) === 'over-packed',
         } as ClubWithId;
       });
       
@@ -219,19 +203,93 @@ export default function DashboardPage() {
       setAllClubs(mockClubData); 
       setLoadingClubs(false);
     });
-
     return () => unsubscribe();
-  }, [toast]); 
+  }, [toast, liveClubCounts]); // Added liveClubCounts to re-evaluate trending status
 
-  const handleGetUserLocation = () => {
+  // Fetch live club counts
+  const fetchLiveCounts = useCallback(async () => {
+    try {
+      const counts = await getLiveClubCounts();
+      setLiveClubCounts(counts);
+    } catch (error) {
+      console.error("Failed to fetch live club counts:", error);
+      // Optionally, show a toast for this error, but it might be noisy if it happens often
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchLiveCounts(); // Fetch on initial load
+    const interval = setInterval(fetchLiveCounts, 1 * 60 * 1000); // Fetch every 1 minute
+    return () => clearInterval(interval);
+  }, [fetchLiveCounts]);
+
+  const { closestClubInGeofence, locationError: geofenceLocationError } = useGeofenceAutoCheckin({
+    clubs: allClubs,
+    isEnabled: isAutoCheckInEnabled && pollingLocationForGeofence, // Geofence only active if user location is being polled
+    userLocation: userLocation, // Pass userLocation to the geofence hook
+  });
+  
+  useHeartbeatTracker({
+    clubId: closestClubInGeofence?.id || null,
+    userLocation: userLocation,
+    isEnabled: isAutoCheckInEnabled && !!closestClubInGeofence, // Heartbeat only active if in a club geofence and enabled
+  });
+  
+  useEffect(() => {
+    if (geofenceLocationError) {
+      toast({ variant: 'destructive', title: 'Auto Check-In Location Issue', description: geofenceLocationError });
+    }
+  }, [geofenceLocationError, toast]);
+
+  const watchIdRef = useRef<number | null>(null);
+
+  const startLocationPolling = useCallback(() => {
+    if (navigator.geolocation && !watchIdRef.current) {
+      setPollingLocationForGeofence(true);
+      setLocationLoading(true);
+      watchIdRef.current = navigator.geolocation.watchPosition(
+        (position) => {
+          setUserLocation({ lat: position.coords.latitude, lng: position.coords.longitude });
+          setLocationLoading(false);
+        },
+        (error) => {
+          console.error("Error watching user location:", error);
+          toast({ title: "Location Watch Error", description: `Could not watch your location: ${error.message}. Auto features may be limited.`, variant: "destructive" });
+          setLocationLoading(false);
+          setPollingLocationForGeofence(false);
+          // If watch fails, stop it
+          if (watchIdRef.current) navigator.geolocation.clearWatch(watchIdRef.current);
+          watchIdRef.current = null;
+        },
+        { enableHighAccuracy: true, maximumAge: 10000, timeout: 15000, distanceFilter: 10 } // Distance filter for watch
+      );
+      toast({ title: "Location Tracking Started", description: "App will now monitor your location for auto check-in." });
+    }
+  }, [toast]);
+
+  const stopLocationPolling = useCallback(() => {
+    if (watchIdRef.current && navigator.geolocation) {
+      navigator.geolocation.clearWatch(watchIdRef.current);
+      watchIdRef.current = null;
+    }
+    setPollingLocationForGeofence(false);
+    // setUserLocation(null); // Optionally clear location when polling stops
+    toast({ title: "Location Tracking Stopped", description: "Auto check-in features are now paused." });
+  }, [toast]);
+
+  const handleGetUserLocationOnce = () => {
     if (navigator.geolocation) {
       setLocationLoading(true);
       navigator.geolocation.getCurrentPosition(
         (position) => {
           setUserLocation({ lat: position.coords.latitude, lng: position.coords.longitude });
           setLocationLoading(false);
-          setSortBy("nearby"); 
+          setSortBy("nearby");
           toast({ title: "Location Found", description: "Sorting clubs by your location. You can now enable Auto Check-In." });
+          // If not already polling, start polling after the first manual location get for auto check-in
+          if (isAutoCheckInEnabled && !pollingLocationForGeofence) {
+             startLocationPolling();
+          }
         },
         (error) => {
           console.error("Error getting user location:", error);
@@ -244,15 +302,13 @@ export default function DashboardPage() {
     }
   };
   
-  const processedClubs = useMemo(() => {
-    let clubsToProcess = [...allClubs];
-
-    if (userLocation) {
-      clubsToProcess = clubsToProcess.map(club => ({
-        ...club,
-        distance: club.location ? haversineDistance(userLocation.lat, userLocation.lng, club.location.lat, club.location.lng) : Infinity,
-      }));
-    }
+  const clubsWithLiveCountsAndDistance = useMemo(() => {
+    let clubsToProcess = allClubs.map(club => ({
+      ...club,
+      currentCount: liveClubCounts[club.id] ?? club.currentCount ?? 0, // Prioritize live count, fallback to club's own currentCount (admin set), then 0
+      isTrending: getClubStatus(liveClubCounts[club.id] ?? club.currentCount ?? 0, club.capacityThresholds || {}) === 'packed' || getClubStatus(liveClubCounts[club.id] ?? club.currentCount ?? 0, club.capacityThresholds || {}) === 'over-packed',
+      distance: userLocation && club.location ? haversineDistance(userLocation.lat, userLocation.lng, club.location.lat, club.location.lng) : Infinity,
+    }));
 
     if (filterTags.length > 0) {
       clubsToProcess = clubsToProcess.filter(club => 
@@ -263,62 +319,53 @@ export default function DashboardPage() {
       );
     }
     
-    if (sortBy !== "nearby") {
-        clubsToProcess.sort((a, b) => {
-            if (a.isTrending && !b.isTrending) return -1;
-            if (!a.isTrending && b.isTrending) return 1;
-            if (sortBy === "crowded") return (b.currentCount || 0) - (a.currentCount || 0);
-            return a.name.localeCompare(b.name); 
-        });
-    } else if (userLocation) { 
+    if (sortBy === "nearby" && userLocation) {
          clubsToProcess.sort((a, b) => (a.distance ?? Infinity) - (b.distance ?? Infinity));
     } else if (sortBy === "crowded") { 
         clubsToProcess.sort((a,b) => (b.currentCount || 0) - (a.currentCount || 0));
-    } else { 
+    } else { // default
         clubsToProcess.sort((a,b) => a.name.localeCompare(b.name));
     }
-
     return clubsToProcess;
-  }, [allClubs, userLocation, sortBy, filterTags]);
-
-
-  useEffect(() => {
-    setDisplayedClubs(processedClubs);
-  }, [processedClubs]);
+  }, [allClubs, userLocation, sortBy, filterTags, liveClubCounts]);
 
 
   const handleSortChange = (value: string) => {
     if (value === "nearby" && !userLocation && !locationLoading) {
-      handleGetUserLocation(); 
+      handleGetUserLocationOnce(); 
     } else {
       setSortBy(value);
     }
   };
 
   const handleFilterChange = (value: string) => {
-    if (value === "all") {
-        setFilterTags([]);
-    } else {
-        setFilterTags([value]);
-    }
+    setFilterTags(value === "all" ? [] : [value]);
   };
 
   const handleAutoCheckInToggle = (checked: boolean) => {
     if (checked && !userLocation) {
       toast({ title: "Location Needed", description: "Please 'Use My Location' first to enable auto check-in.", variant: "default" });
-      setIsAutoCheckInEnabled(false);
+      setIsAutoCheckInEnabled(false); // Ensure switch reflects false state
       return;
     }
     setIsAutoCheckInEnabled(checked);
     if (checked) {
-      toast({ title: "Auto Check-In Enabled", description: "App will now try to check you in/out automatically." });
+      startLocationPolling();
     } else {
-      toast({ title: "Auto Check-In Disabled" });
+      stopLocationPolling();
     }
   };
 
+  // Effect to stop polling if component unmounts
+  useEffect(() => {
+    return () => {
+      if (watchIdRef.current && navigator.geolocation) {
+        navigator.geolocation.clearWatch(watchIdRef.current);
+      }
+    };
+  }, []);
 
-  if (loadingClubs ) { 
+  if (loadingClubs) { 
     return <DashboardLoadingSkeleton />;
   }
   
@@ -331,7 +378,7 @@ export default function DashboardPage() {
 
       <div className="my-6 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <Button 
-          onClick={handleGetUserLocation} 
+          onClick={handleGetUserLocationOnce} 
           disabled={locationLoading} 
           variant="outline"
           className="w-full md:w-auto"
@@ -369,10 +416,10 @@ export default function DashboardPage() {
             id="auto-checkin-toggle"
             checked={isAutoCheckInEnabled}
             onCheckedChange={handleAutoCheckInToggle}
-            disabled={!userLocation && !isAutoCheckInEnabled} 
+            disabled={!userLocation && !isAutoCheckInEnabled} // Disable if no location or not explicitly enabled after location
           />
           <Label htmlFor="auto-checkin-toggle" className={(!userLocation && !isAutoCheckInEnabled) ? 'text-muted-foreground' : ''}>
-            Auto Check-In
+            Auto Presence
           </Label>
         </div>
       </div>
@@ -387,13 +434,12 @@ export default function DashboardPage() {
           </TabsTrigger>
         </TabsList>
         <TabsContent value="list" className="mt-6">
-           <ClubList clubs={displayedClubs} />
+           <ClubList clubs={clubsWithLiveCountsAndDistance} />
         </TabsContent>
         <TabsContent value="map" className="mt-6">
-          <ClubMapWrapper clubs={displayedClubs} />
+          <ClubMapWrapper clubs={clubsWithLiveCountsAndDistance} />
         </TabsContent>
       </Tabs>
     </div>
   );
 }
-

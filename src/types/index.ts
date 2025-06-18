@@ -8,7 +8,7 @@ export interface Club {
     lat: number;
     lng: number;
   } | null; // GeoPoint can be null
-  currentCount: number;
+  currentCount: number; // This will represent the live count on the dashboard, derived from heartbeats. Admins might set a base/manual value.
   capacityThresholds: {
     low: number;
     moderate: number;
@@ -33,17 +33,25 @@ export interface ClubWithId extends Club {
   isTrending?: boolean; // For trending display
 }
 
-export interface Visit {
-  userId: string; // Firebase Auth UID of the user who made the visit
-  deviceId: string; // Hashed device ID, potentially for geofencing or more granular device tracking
+// The 'visits' collection will now store heartbeat data.
+// Document ID in 'visits' collection will be the deviceId.
+export interface HeartbeatEntry {
   clubId: string;
-  entryTimestamp: Timestamp | Date | string;
-  exitTimestamp?: Timestamp | Date | string | null;
+  location: { lat: number; lng: number }; // User's location at the time of heartbeat
+  lastSeen: Timestamp; // Firestore Timestamp of the last heartbeat
+  // userId?: string; // Optional: if Firebase Auth was used
 }
 
-export interface VisitWithId extends Visit {
-  id: string;
+// This type might be used if fetching heartbeat entries with their deviceId (doc ID)
+export interface HeartbeatEntryWithId extends HeartbeatEntry {
+  deviceId: string;
 }
+
+
+// NOTE: The previous Visit / VisitWithId types for detailed visit logging (entry/exit)
+// are removed as the 'visits' collection is being repurposed for heartbeats.
+// If historical visit logging is needed for analytics, a separate collection and logic
+// would be required.
 
 export type ClubStatus = "low" | "moderate" | "packed" | "over-packed" | "unknown";
 
@@ -52,11 +60,3 @@ export interface UserLocation {
   lat: number;
   lng: number;
 }
-
-// Optional: Define a type for user profiles if you plan to use the /users/{userId} collection
-// export interface UserProfile {
-//   id: string; // Should match Firebase Auth UID
-//   displayName?: string;
-//   email?: string; // Usually from Auth, but can be stored for convenience
-//   // Add other app-specific user fields here
-// }

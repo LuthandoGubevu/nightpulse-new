@@ -3,8 +3,8 @@
 
 import { revalidatePath } from "next/cache";
 import { firestore } from "@/lib/firebase";
-import { collection, addDoc, doc, updateDoc, deleteDoc, Timestamp, getDoc } from "firebase/firestore";
-import type { Club } from "@/types";
+import { collection, addDoc, doc, updateDoc, deleteDoc, Timestamp, getDoc, getDocs, query, where } from "firebase/firestore";
+import type { Club, HeartbeatEntry } from "@/types";
 import { z } from "zod";
 import { parseCommaSeparatedString } from "@/lib/utils";
 
@@ -15,7 +15,7 @@ const ClubSchema = z.object({
     lat: z.number().min(-90).max(90),
     lng: z.number().min(-180).max(180),
   }).nullable(),
-  currentCount: z.number().min(0).default(0),
+  currentCount: z.coerce.number().min(0).default(0), // This is the admin-set base/manual count
   capacityThresholds: z.object({
     low: z.number().min(0),
     moderate: z.number().min(0),
@@ -23,11 +23,11 @@ const ClubSchema = z.object({
   }),
   imageUrl: z.string().url().optional().or(z.literal('')),
   estimatedWaitTime: z.string().optional().or(z.literal('')),
-  tags: z.string().optional().transform(val => parseCommaSeparatedString(val)), // Comma-separated string from form
-  musicGenres: z.string().optional().transform(val => parseCommaSeparatedString(val)), // Comma-separated string from form
+  tags: z.string().optional().transform(val => parseCommaSeparatedString(val)),
+  musicGenres: z.string().optional().transform(val => parseCommaSeparatedString(val)),
   tonightDJ: z.string().optional().or(z.literal('')),
   announcementMessage: z.string().optional().or(z.literal('')),
-  announcementExpiresAt: z.string().optional().nullable().transform(val => { // Expecting a string that can be converted to Date
+  announcementExpiresAt: z.string().optional().nullable().transform(val => {
     if (!val) return null;
     const date = new Date(val);
     return isNaN(date.getTime()) ? null : Timestamp.fromDate(date);
@@ -66,22 +66,20 @@ export async function addClubAction(formData: FormData) {
   const validation = ClubSchema.safeParse(rawData);
 
   if (!validation.success) {
-    console.error("Validation errors:", validation.error.flatten().fieldErrors);
     return { 
       success: false, 
-      error: "Validation failed. Please check the form fields.", 
+      error: "Validation failed.", 
       errors: validation.error.flatten().fieldErrors 
     };
   }
   
   const clubDataValidated = validation.data;
 
-  // Explicitly structure the data for Firestore, especially for Timestamp
   const clubDataForFirestore: Omit<Club, 'lastUpdated'> & { lastUpdated: Timestamp } = {
     name: clubDataValidated.name,
     address: clubDataValidated.address,
     location: clubDataValidated.location,
-    currentCount: clubDataValidated.currentCount,
+    currentCount: clubDataValidated.currentCount, // Admin-set base count
     capacityThresholds: clubDataValidated.capacityThresholds,
     imageUrl: clubDataValidated.imageUrl || '',
     estimatedWaitTime: clubDataValidated.estimatedWaitTime || '',
@@ -89,20 +87,19 @@ export async function addClubAction(formData: FormData) {
     musicGenres: clubDataValidated.musicGenres || [],
     tonightDJ: clubDataValidated.tonightDJ || '',
     announcementMessage: clubDataValidated.announcementMessage || '',
-    announcementExpiresAt: clubDataValidated.announcementExpiresAt, // Already a Timestamp or null from Zod transform
+    announcementExpiresAt: clubDataValidated.announcementExpiresAt,
     lastUpdated: Timestamp.now(),
   };
 
   try {
     await addDoc(collection(firestore, "clubs"), clubDataForFirestore);
     revalidatePath("/admin/clubs");
-    revalidatePath("/"); // For user dashboard
+    revalidatePath("/"); 
     return { success: true };
   } catch (error: any) {
-    console.error("Error adding club to Firestore:", error);
     return { 
       success: false, 
-      error: error.message || "Failed to add club. Check server logs for details." 
+      error: error.message || "Failed to add club." 
     };
   }
 }
@@ -139,10 +136,9 @@ export async function updateClubAction(clubId: string, formData: FormData) {
   const validation = ClubSchema.safeParse(rawData);
 
   if (!validation.success) {
-    console.error("Validation errors:", validation.error.flatten().fieldErrors);
     return { 
       success: false, 
-      error: "Validation failed. Please check the form fields.", 
+      error: "Validation failed.", 
       errors: validation.error.flatten().fieldErrors 
     };
   }
@@ -153,7 +149,7 @@ export async function updateClubAction(clubId: string, formData: FormData) {
     name: clubDataValidated.name,
     address: clubDataValidated.address,
     location: clubDataValidated.location,
-    currentCount: clubDataValidated.currentCount,
+    currentCount: clubDataValidated.currentCount, // Admin-set base count
     capacityThresholds: clubDataValidated.capacityThresholds,
     imageUrl: clubDataValidated.imageUrl || '',
     estimatedWaitTime: clubDataValidated.estimatedWaitTime || '',
@@ -165,19 +161,17 @@ export async function updateClubAction(clubId: string, formData: FormData) {
     lastUpdated: Timestamp.now(),
   };
 
-
   try {
     const clubRef = doc(firestore, "clubs", clubId);
     await updateDoc(clubRef, clubDataForFirestore);
     revalidatePath("/admin/clubs");
     revalidatePath(`/admin/clubs/edit/${clubId}`);
-    revalidatePath("/"); // For user dashboard
+    revalidatePath("/");
     return { success: true };
   } catch (error: any) {
-    console.error("Error updating club in Firestore:", error);
     return { 
       success: false, 
-      error: error.message || "Failed to update club. Check server logs for details." 
+      error: error.message || "Failed to update club." 
     };
   }
 }
@@ -190,15 +184,13 @@ export async function deleteClubAction(clubId: string) {
     revalidatePath("/");
     return { success: true };
   } catch (error: any) {
-    console.error("Error deleting club from Firestore:", error);
     return { 
       success: false, 
-      error: error.message || "Failed to delete club. Check server logs for details." 
+      error: error.message || "Failed to delete club." 
     };
   }
 }
 
-// Helper function to convert Firestore Timestamps in club data if necessary
 const convertClubTimestamps = (data: any): Omit<Club, 'lastUpdated' | 'announcementExpiresAt'> & { lastUpdated: string, announcementExpiresAt: string | null } => {
   return {
     ...data,
@@ -208,7 +200,6 @@ const convertClubTimestamps = (data: any): Omit<Club, 'lastUpdated' | 'announcem
       : null,
   };
 };
-
 
 export async function getClubById(clubId: string): Promise<Club | null> {
   if (!firestore) {
@@ -225,12 +216,44 @@ export async function getClubById(clubId: string): Promise<Club | null> {
       return {
         id: clubSnap.id,
         ...clubWithConvertedTimestamps,
-      } as Club;
+      } as Club; // Casting as Club, client will merge live count
     } else {
       return null;
     }
   } catch (error) {
     console.error("Error fetching club by ID:", error);
     return null;
+  }
+}
+
+/**
+ * Derives live crowd counts for all clubs based on recent heartbeats.
+ * @returns A Promise resolving to an object mapping clubId to its live count.
+ */
+export async function getLiveClubCounts(): Promise<Record<string, number>> {
+  if (!firestore) {
+    console.warn("Firestore not initialized in getLiveClubCounts. Returning empty counts.");
+    return {};
+  }
+
+  const liveCounts: Record<string, number> = {};
+  const fiveAndHalfMinutesAgo = Timestamp.fromMillis(Date.now() - 5.5 * 60 * 1000);
+
+  try {
+    const visitsRef = collection(firestore, 'visits');
+    const q = query(visitsRef, where('lastSeen', '>=', fiveAndHalfMinutesAgo));
+    const querySnapshot = await getDocs(q);
+
+    querySnapshot.forEach((docSnap) => {
+      const visitData = docSnap.data() as Partial<HeartbeatEntry>; // Partial because deviceId is doc ID
+      if (visitData.clubId) {
+        liveCounts[visitData.clubId] = (liveCounts[visitData.clubId] || 0) + 1;
+      }
+    });
+    // console.log("Derived live club counts:", liveCounts);
+    return liveCounts;
+  } catch (error) {
+    console.error('Error fetching live club counts:', error);
+    return {}; // Return empty or cached counts on error
   }
 }
