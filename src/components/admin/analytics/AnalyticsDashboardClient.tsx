@@ -104,19 +104,21 @@ export function AnalyticsDashboardClient() {
     setFirestoreError(null);
     const clubsRef = collection(firestore, "clubs");
     const unsubscribeClubs = onSnapshot(query(clubsRef), (snapshot) => {
-      let liveClubCounts: Record<string, number> = {}; // Temp var to get live counts for active clubs display
+      let liveClubCountsData: Record<string, number> = {}; 
 
-      // Fetch live counts to determine "active" clubs based on heartbeats
       getLiveClubCounts().then(counts => {
-        liveClubCounts = counts;
+        liveClubCountsData = counts;
         let activeCount = 0;
         snapshot.docs.forEach(doc => {
-          if ((liveClubCounts[doc.id] || 0) > 0) {
+          if ((liveClubCountsData[doc.id] || 0) > 0) {
             activeCount++;
           }
         });
         setActiveClubs(activeCount);
-      }).catch(err => console.error("Error fetching live counts for active clubs metric:", err));
+      }).catch(err => {
+        console.error("Error fetching live counts for active clubs metric:", err);
+        // Potentially set activeClubs to a fallback or show an error indicator
+      });
       
       setTotalClubs(snapshot.docs.length);
       setLoadingActiveClubs(false);
@@ -147,16 +149,15 @@ export function AnalyticsDashboardClient() {
       }
       setFirestoreError(null);
       try {
-        const visitsRef = collection(firestore, "visits"); // 'visits' now holds heartbeats
+        const visitsRef = collection(firestore, "visits"); 
         const thirtyDaysAgo = new Date();
         thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-        // Querying by lastSeen which should be a Timestamp
+        
         const heartbeatsQuery = query(visitsRef, where("lastSeen", ">=", Timestamp.fromDate(thirtyDaysAgo)));
 
         const snapshot = await getDocs(heartbeatsQuery);
         if (snapshot.empty) {
-          console.log("No heartbeat data found in Firestore for analytics.");
-          // Set to empty rather than mock
+          console.log("No heartbeat data found in Firestore for analytics in the last 30 days.");
         } else {
           heartbeatsToProcess = snapshot.docs.map(doc => ({
              ...(doc.data() as HeartbeatEntry), 
@@ -235,3 +236,5 @@ export function AnalyticsDashboardClient() {
     </div>
   );
 }
+
+    
