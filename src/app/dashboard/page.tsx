@@ -18,6 +18,9 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { haversineDistance, getClubStatus } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
+import { useGeofenceAutoCheckin } from "@/hooks/useGeofenceAutoCheckin";
 
 const mockClubData: ClubWithId[] = [
   {
@@ -94,7 +97,7 @@ const mockClubData: ClubWithId[] = [
   }
 ].map(club => ({
   ...club,
-  imageUrl: club.imageUrl || `https://placehold.co/600x400.png?text=${encodeURIComponent(club.name)}`,
+  imageUrl: club.imageUrl || `https://placehold.co/600x400.png`,
 }));
 
 
@@ -107,11 +110,12 @@ function DashboardLoadingSkeleton() {
       />
       <div className="mt-6 space-y-4">
         <div className="flex flex-col md:flex-row md:items-center gap-4">
-            <Skeleton className="h-10 w-full md:w-auto" /> {/* Location button */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:flex md:flex-row gap-2 w-full md:w-auto"> {/* Filter selects */}
+            <Skeleton className="h-10 w-full md:w-auto" /> {}
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:flex md:flex-row gap-2 w-full md:w-auto"> {}
                 <Skeleton className="h-10 w-full" />
                 <Skeleton className="h-10 w-full" />
             </div>
+            <Skeleton className="h-10 w-32" /> {}
         </div>
         <div className="grid w-full grid-cols-2 md:w-96">
           <Skeleton className="h-10" />
@@ -120,7 +124,7 @@ function DashboardLoadingSkeleton() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {[...Array(3)].map((_, i) => (
             <Card key={i} className="flex flex-col overflow-hidden">
-              <Skeleton className="h-48 w-full" />
+              
               <CardContent className="p-6 flex-grow space-y-2">
                 <Skeleton className="h-6 w-3/4" />
                 <Skeleton className="h-4 w-full" />
@@ -138,8 +142,7 @@ function DashboardLoadingSkeleton() {
 }
 
 export default function DashboardPage() {
-  // const { user, loading: authLoading } = useAuth(); // Auth hook no longer used for redirection
-  // const router = useRouter(); // Router no longer used for auth redirection
+  
   const { toast } = useToast();
 
   const [allClubs, setAllClubs] = useState<ClubWithId[]>([]);
@@ -149,18 +152,24 @@ export default function DashboardPage() {
   const [userLocation, setUserLocation] = useState<UserLocation | null>(null);
   const [locationLoading, setLocationLoading] = useState(false);
   
-  const [sortBy, setSortBy] = useState<string>("default"); // 'default', 'nearby', 'crowded'
-  const [filterTags, setFilterTags] = useState<string[]>([]); // e.g., ['chill', 'free entry']
+  const [sortBy, setSortBy] = useState<string>("default"); 
+  const [filterTags, setFilterTags] = useState<string[]>([]); 
+  const [isAutoCheckInEnabled, setIsAutoCheckInEnabled] = useState(false);
 
-  // useEffect(() => {
-  //   // This auth check is removed as per the requirement
-  //   // if (!authLoading && !user) {
-  //   //   router.replace("/auth?redirect=/dashboard");
-  //   // }
-  // }, [user, authLoading, router]);
+  const { locationError: geofenceError, autoCheckedInClubId } = useGeofenceAutoCheckin({
+    clubs: allClubs,
+    isEnabled: isAutoCheckInEnabled,
+  });
 
   useEffect(() => {
-    if (!firestore) { // If Firestore isn't initialized (e.g., missing config)
+    if (geofenceError) {
+      toast({ variant: 'destructive', title: 'Auto Check-In Issue', description: geofenceError });
+    }
+  }, [geofenceError, toast]);
+
+
+  useEffect(() => {
+    if (!firestore) { 
       console.warn("Firestore is not initialized. Displaying mock data for dashboard.");
       setAllClubs(mockClubData);
       setLoadingClubs(false);
@@ -187,7 +196,7 @@ export default function DashboardPage() {
           currentCount: data.currentCount || 0,
           capacityThresholds: data.capacityThresholds || { low: 50, moderate: 100, packed: 150 },
           lastUpdated: data.lastUpdated instanceof Timestamp ? data.lastUpdated.toDate().toISOString() : new Date().toISOString(),
-          imageUrl: data.imageUrl,
+          imageUrl: data.imageUrl || `https://placehold.co/600x400.png`,
           estimatedWaitTime: data.estimatedWaitTime,
           tags: data.tags || [],
           musicGenres: data.musicGenres || [],
@@ -199,7 +208,7 @@ export default function DashboardPage() {
       });
       
       if (clubList.length === 0) {
-        setAllClubs(mockClubData); // Use mock data if Firestore returns empty
+        setAllClubs(mockClubData); 
       } else {
         setAllClubs(clubList);
       }
@@ -207,12 +216,12 @@ export default function DashboardPage() {
     }, (error) => {
       console.error("Error fetching clubs with real-time listener:", error);
       toast({ title: "Error", description: "Could not fetch club data. Displaying sample data.", variant: "destructive" });
-      setAllClubs(mockClubData); // Use mock data on error
+      setAllClubs(mockClubData); 
       setLoadingClubs(false);
     });
 
     return () => unsubscribe();
-  }, [toast]); // Removed user, authLoading from dependencies as they are not used for auth checks anymore
+  }, [toast]); 
 
   const handleGetUserLocation = () => {
     if (navigator.geolocation) {
@@ -222,7 +231,7 @@ export default function DashboardPage() {
           setUserLocation({ lat: position.coords.latitude, lng: position.coords.longitude });
           setLocationLoading(false);
           setSortBy("nearby"); 
-          toast({ title: "Location Found", description: "Sorting clubs by your location." });
+          toast({ title: "Location Found", description: "Sorting clubs by your location. You can now enable Auto Check-In." });
         },
         (error) => {
           console.error("Error getting user location:", error);
@@ -279,7 +288,7 @@ export default function DashboardPage() {
 
 
   const handleSortChange = (value: string) => {
-    if (value === "nearby" && !userLocation) {
+    if (value === "nearby" && !userLocation && !locationLoading) {
       handleGetUserLocation(); 
     } else {
       setSortBy(value);
@@ -294,21 +303,25 @@ export default function DashboardPage() {
     }
   };
 
+  const handleAutoCheckInToggle = (checked: boolean) => {
+    if (checked && !userLocation) {
+      toast({ title: "Location Needed", description: "Please 'Use My Location' first to enable auto check-in.", variant: "default" });
+      setIsAutoCheckInEnabled(false);
+      return;
+    }
+    setIsAutoCheckInEnabled(checked);
+    if (checked) {
+      toast({ title: "Auto Check-In Enabled", description: "App will now try to check you in/out automatically." });
+    } else {
+      toast({ title: "Auto Check-In Disabled" });
+    }
+  };
 
-  if (loadingClubs ) { // Show skeleton if clubs are loading (authLoading is removed)
+
+  if (loadingClubs ) { 
     return <DashboardLoadingSkeleton />;
   }
   
-  // This check is no longer needed as auth is removed
-  // if (!user && !authLoading) { 
-  //   return (
-  //      <div className="container mx-auto flex min-h-[calc(100vh-theme(spacing.16))] flex-col items-center justify-center py-12">
-  //           <p>Redirecting to sign-in...</p>
-  //      </div>
-  //   );
-  // }
-  
-
   return (
     <div className="container mx-auto py-8 px-4">
       <PageHeader
@@ -350,6 +363,17 @@ export default function DashboardPage() {
               <SelectItem value="rooftop">Filter: Rooftop</SelectItem>
             </SelectContent>
           </Select>
+        </div>
+        <div className="flex items-center space-x-2 w-full md:w-auto justify-start md:justify-end">
+          <Switch
+            id="auto-checkin-toggle"
+            checked={isAutoCheckInEnabled}
+            onCheckedChange={handleAutoCheckInToggle}
+            disabled={!userLocation && !isAutoCheckInEnabled} 
+          />
+          <Label htmlFor="auto-checkin-toggle" className={(!userLocation && !isAutoCheckInEnabled) ? 'text-muted-foreground' : ''}>
+            Auto Check-In
+          </Label>
         </div>
       </div>
 
