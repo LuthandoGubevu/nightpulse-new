@@ -1,3 +1,4 @@
+
 "use client";
 import { APIProvider, Map, ControlPosition } from '@vis.gl/react-google-maps';
 import type { ClubWithId } from '@/types';
@@ -8,6 +9,7 @@ import { Icons } from '@/components/icons';
 import { CustomMapControl } from './CustomMapControl';
 import { useState } from 'react';
 import { WaitTimeDialog } from './WaitTimeDialog';
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 interface ClubMapWrapperProps {
   clubs: ClubWithId[];
@@ -22,13 +24,17 @@ export default function ClubMapWrapper({ clubs }: ClubMapWrapperProps) {
   
   if (!mapConfig.apiKey) {
     return (
-      <div className="flex flex-col items-center justify-center h-96 bg-muted/50 rounded-lg text-muted-foreground p-8 text-center shadow-inner">
-        <Icons.warning className="h-12 w-12 text-destructive mb-4" />
-        <h3 className="text-xl font-semibold mb-2 font-headline">Map Display Disabled</h3>
-        <p className="text-sm">
-          Google Maps API Key is not configured. Please set the <code className="bg-primary/10 text-primary font-mono p-1 rounded-sm text-xs">NEXT_PUBLIC_GOOGLE_MAPS_API_KEY</code> environment variable.
-        </p>
-      </div>
+      <Alert variant="destructive" className="flex flex-col items-center justify-center h-96 bg-muted/50 rounded-lg p-8 text-center shadow-inner">
+        <Icons.warning className="h-12 w-12 mb-4" />
+        <AlertTitle className="text-xl font-semibold mb-2 font-headline">Map Display Disabled</AlertTitle>
+        <AlertDescription className="text-sm">
+          Google Maps API Key is not configured. 
+          Please ensure the <code className="font-mono text-xs">NEXT_PUBLIC_GOOGLE_MAPS_API_KEY</code> environment variable is correctly set.
+          <br />- For local development: Set it in your <code className="font-mono text-xs">.env</code> file and restart your development server.
+          <br />- For deployed environments (e.g., Netlify): Set it in your hosting provider's environment variable settings and trigger a new deployment.
+          <br />Map functionality will be unavailable until the API key is correctly configured.
+        </AlertDescription>
+      </Alert>
     );
   }
 

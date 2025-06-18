@@ -370,7 +370,11 @@ export function ClubForm({ club, mode }: ClubFormProps) {
                   <Icons.warning className="h-4 w-4" />
                   <AlertTitle>Map Display Disabled</AlertTitle>
                   <AlertDescription>
-                      Google Maps API Key is not configured. Please ensure the <code className="bg-primary/10 text-primary font-mono p-1 rounded-sm text-xs">NEXT_PUBLIC_GOOGLE_MAPS_API_KEY</code> environment variable is correctly set in your <code className="bg-primary/10 text-primary font-mono p-1 rounded-sm text-xs">.env</code> file and that your development server has been restarted. Map functionality will be unavailable.
+                      Google Maps API Key is not configured. 
+                      Please ensure the <code className="font-mono text-xs">NEXT_PUBLIC_GOOGLE_MAPS_API_KEY</code> environment variable is correctly set.
+                      <br />- For local development: Set it in your <code className="font-mono text-xs">.env</code> file and restart your development server.
+                      <br />- For deployed environments (e.g., Netlify): Set it in your hosting provider's environment variable settings and trigger a new deployment.
+                      <br />Map functionality will be unavailable until the API key is correctly configured.
                   </AlertDescription>
                 </Alert>
             )}
