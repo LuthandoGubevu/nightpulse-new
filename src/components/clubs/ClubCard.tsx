@@ -7,13 +7,12 @@ import { Icons } from "@/components/icons";
 import { ClubStatusIndicator } from "./ClubStatusIndicator";
 import { WaitTimeDialog } from "./WaitTimeDialog";
 import type { ClubWithId, ClubStatus } from "@/types";
-import { getClubStatus, cn } from "@/lib/utils"; // Removed formatDate as it's not used here
-import { useState, useEffect } from "react"; // Added useEffect
+import { getClubStatus } from "@/lib/utils";
+import { useState, useEffect } from "react";
 import { Badge } from "@/components/ui/badge";
 import { ClubTimelineDialog } from "./ClubTimelineDialog"; 
 import { Timestamp } from "firebase/firestore";
-import { useToast } from "@/hooks/use-toast"; // Added useToast
-import { incrementClubCountAction, decrementClubCountAction } from "@/actions/visitActions"; // Added visitActions
+// Removed useToast and visitActions as manual check-in is removed
 
 interface ClubCardProps {
   club: ClubWithId;
@@ -22,45 +21,6 @@ interface ClubCardProps {
 export function ClubCard({ club }: ClubCardProps) {
   const [isWaitTimeDialogOpen, setIsWaitTimeDialogOpen] = useState(false);
   const [isTimelineDialogOpen, setIsTimelineDialogOpen] = useState(false); 
-  const { toast } = useToast();
-  const [isCheckedIn, setIsCheckedIn] = useState(false);
-  const [isProcessingStatus, setIsProcessingStatus] = useState(false);
-  const localStorageKey = `nightpulse_checkedIn_status_${club.id}`;
-
-  useEffect(() => {
-    // Client-side only effect
-    if (typeof window !== 'undefined') {
-      const storedStatus = localStorage.getItem(localStorageKey);
-      if (storedStatus === 'true') {
-        setIsCheckedIn(true);
-      }
-    }
-  }, [localStorageKey]);
-
-  const handleCheckInToggle = async () => {
-    setIsProcessingStatus(true);
-    if (isCheckedIn) { // Currently checked in, so check out
-      const result = await decrementClubCountAction(club.id);
-      if (result.success) {
-        localStorage.removeItem(localStorageKey);
-        setIsCheckedIn(false);
-        toast({ title: "Checked Out", description: `You've been checked out from ${club.name}.` });
-      } else {
-        toast({ title: "Check-Out Failed", description: result.error, variant: "destructive" });
-      }
-    } else { // Currently checked out, so check in
-      const result = await incrementClubCountAction(club.id);
-      if (result.success) {
-        localStorage.setItem(localStorageKey, 'true');
-        setIsCheckedIn(true);
-        toast({ title: "Checked In!", description: `You're now checked in at ${club.name}.` });
-      } else {
-        toast({ title: "Check-In Failed", description: result.error, variant: "destructive" });
-      }
-    }
-    setIsProcessingStatus(false);
-  };
-
 
   const status: ClubStatus = getClubStatus(club.currentCount, club.capacityThresholds);
 
@@ -151,23 +111,7 @@ export function ClubCard({ club }: ClubCardProps) {
           )}
         </CardContent>
         <CardFooter className="p-4 border-t flex flex-col gap-2">
-          <Button 
-            onClick={handleCheckInToggle} 
-            disabled={isProcessingStatus} 
-            className={cn(
-              "w-full",
-              isCheckedIn ? "bg-red-600 hover:bg-red-700 text-white" : "bg-green-600 hover:bg-green-700 text-white"
-            )}
-          >
-            {isProcessingStatus ? (
-              <Icons.spinner className="mr-2 h-4 w-4 animate-spin" />
-            ) : isCheckedIn ? (
-              <Icons.logOut className="mr-2 h-4 w-4" />
-            ) : (
-              <Icons.check className="mr-2 h-4 w-4" />
-            )}
-            {isProcessingStatus ? "Processing..." : isCheckedIn ? "Check Out" : "I'm Here! (Check In)"}
-          </Button>
+          {/* Manual Check-In/Out Button Removed */}
           <div className="grid grid-cols-2 gap-2 w-full">
             <Button onClick={() => setIsWaitTimeDialogOpen(true)} variant="outline" className="w-full">
               <Icons.clock className="mr-2 h-4 w-4" />
