@@ -12,7 +12,6 @@ import { useState, useEffect } from "react";
 import { Badge } from "@/components/ui/badge";
 import { ClubTimelineDialog } from "./ClubTimelineDialog"; 
 import { Timestamp } from "firebase/firestore";
-// Removed useToast and visitActions as manual check-in is removed
 
 interface ClubCardProps {
   club: ClubWithId;
@@ -111,8 +110,7 @@ export function ClubCard({ club }: ClubCardProps) {
           )}
         </CardContent>
         <CardFooter className="p-4 border-t flex flex-col gap-2">
-          {/* Manual Check-In/Out Button Removed */}
-          <div className="grid grid-cols-2 gap-2 w-full">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 w-full">
             <Button onClick={() => setIsWaitTimeDialogOpen(true)} variant="outline" className="w-full">
               <Icons.clock className="mr-2 h-4 w-4" />
               AI Wait Time
