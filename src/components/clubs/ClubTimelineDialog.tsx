@@ -12,10 +12,10 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Icons } from "@/components/icons";
-import type { ClubWithId, Visit } from "@/types";
+import type { ClubWithId, HeartbeatEntry } from "@/types"; // Changed Visit to HeartbeatEntry
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { firestore } from "@/lib/firebase"; 
-import { collection, query, where, getDocs, Timestamp } from "firebase/firestore";
+import { collection, query, where, getDocs, Timestamp, orderBy } from "firebase/firestore"; // Added orderBy
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription, AlertTitle } from "../ui/alert";
 
@@ -25,79 +25,53 @@ interface ClubTimelineDialogProps {
   onOpenChange: (isOpen: boolean) => void;
 }
 
-const mockClubHourlyAggregates: Record<string, { name: string; visitors: number }[]> = {
-  'mock-club-1': Array.from({ length: 24 }, (_, i) => {
-    const hour = i.toString().padStart(2, '0') + ":00";
-    let visitors = 0;
-    if (i >= 19 && i <= 23) visitors = Math.floor(Math.random() * 15) + 5; // Evening peak
-    if (i >= 0 && i <= 2) visitors = Math.floor(Math.random() * 10) + 2; // Late night
-    return { name: hour, visitors };
-  }),
-  'mock-club-2': Array.from({ length: 24 }, (_, i) => {
-    const hour = i.toString().padStart(2, '0') + ":00";
-    let visitors = 0;
-    if (i >= 21 && i <= 23) visitors = Math.floor(Math.random() * 25) + 10; // Peak hours
-    if (i >= 0 && i <= 3) visitors = Math.floor(Math.random() * 20) + 8;   // Late peak
-    return { name: hour, visitors };
-  }),
-   'mock-club-4': Array.from({ length: 24 }, (_, i) => { // The Bassment (packed)
-    const hour = i.toString().padStart(2, '0') + ":00";
-    let visitors = 0;
-    if (i >= 22 || i <= 2) visitors = Math.floor(Math.random() * 30) + 20; // Consistently busy late
-    return { name: hour, visitors };
-  }),
-};
-
-
-async function getHourlyVisitData(clubId: string): Promise<{ name: string; visitors: number }[]> {
+async function getHourlyHeartbeatData(clubId: string): Promise<{ name: string; visitors: number }[]> {
   if (!firestore) {
-    if (mockClubHourlyAggregates[clubId]) {
-      console.log(`Firestore unavailable, using mock hourly aggregates for ${clubId}`);
-      return mockClubHourlyAggregates[clubId];
-    }
+    console.warn(`Firestore unavailable, cannot fetch hourly heartbeats for ${clubId}`);
     return [];
   }
   
   try {
-    const visitsRef = collection(firestore, "visits");
+    const heartbeatsRef = collection(firestore, "visits");
+    // Analyze heartbeats from the last 7 days for the timeline
     const sevenDaysAgo = new Date();
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-    const q = query(visitsRef, where("clubId", "==", clubId), where("entryTimestamp", ">=", Timestamp.fromDate(sevenDaysAgo)));
+    const q = query(
+        heartbeatsRef, 
+        where("clubId", "==", clubId), 
+        where("lastSeen", ">=", Timestamp.fromDate(sevenDaysAgo)),
+        orderBy("lastSeen") // Order by lastSeen to process chronologically if needed, though aggregation makes it less critical
+    );
     
     const querySnapshot = await getDocs(q);
 
-    if (querySnapshot.empty && mockClubHourlyAggregates[clubId]) {
-      console.log(`No real visits for ${clubId}, using mock hourly aggregates.`);
-      return mockClubHourlyAggregates[clubId];
-    }
     if (querySnapshot.empty) {
-        return []; // No real data and no mock specifically defined, return empty
+      console.log(`No recent heartbeats for ${clubId} to generate timeline.`);
+      return [];
     }
 
-    const visits = querySnapshot.docs.map(doc => doc.data() as Visit);
+    const heartbeats = querySnapshot.docs.map(doc => doc.data() as HeartbeatEntry);
     const hourlyCounts: { [key: string]: number } = {};
     for (let i = 0; i < 24; i++) {
         hourlyCounts[i.toString().padStart(2, '0') + ":00"] = 0;
     }
 
-    visits.forEach(visit => {
-        if (visit.entryTimestamp) {
-            const entryDate = visit.entryTimestamp instanceof Timestamp ? visit.entryTimestamp.toDate() : new Date(visit.entryTimestamp);
+    heartbeats.forEach(hb => {
+        if (hb.lastSeen) { // Ensure lastSeen exists
+            const entryDate = hb.lastSeen instanceof Timestamp 
+                ? hb.lastSeen.toDate() 
+                : new Date(hb.lastSeen as string); // Assuming lastSeen could be string from older data
             const hourKey = entryDate.getHours().toString().padStart(2, '0') + ":00";
-            hourlyCounts[hourKey] = (hourlyCounts[hourKey] || 0) + 1;
+            hourlyCounts[hourKey] = (hourlyCounts[hourKey] || 0) + 1; // Count each heartbeat
         }
     });
     
     return Object.entries(hourlyCounts)
         .map(([name, visitors]) => ({ name, visitors }))
-        .sort((a, b) => a.name.localeCompare(b.name));
+        .sort((a, b) => a.name.localeCompare(b.name)); // Sort by hour for the chart
 
   } catch (error) {
-    console.error("Error fetching visit data for timeline:", error);
-    if (mockClubHourlyAggregates[clubId]) {
-      console.log(`Error fetching real timeline for ${clubId}, using mock hourly aggregates as fallback.`);
-      return mockClubHourlyAggregates[clubId];
-    }
+    console.error("Error fetching heartbeat data for timeline:", error);
     return [];
   }
 }
@@ -112,11 +86,12 @@ export function ClubTimelineDialog({ club, isOpen, onOpenChange }: ClubTimelineD
     if (isOpen && club.id) {
       setIsLoading(true);
       setError(null);
-      getHourlyVisitData(club.id)
+      getHourlyHeartbeatData(club.id)
         .then(data => {
           setTimelineData(data);
-          if (data.length === 0 && !mockClubHourlyAggregates[club.id]) { // Only set error if no mock is available either
-            // setError("No visit data found for the last 7 days to generate a timeline.");
+          if (data.length === 0) {
+            // setError("No heartbeat data found for the last 7 days to generate a timeline.");
+            // This state is handled by the "No Data Available" alert now
           }
         })
         .catch(err => {
@@ -133,7 +108,7 @@ export function ClubTimelineDialog({ club, isOpen, onOpenChange }: ClubTimelineD
         <DialogHeader>
           <DialogTitle>Average Crowd Timeline for {club.name}</DialogTitle>
           <DialogDescription>
-            Typical crowd flow based on entries in the last 7 days (real or sample data).
+            Typical crowd flow based on heartbeats in the last 7 days.
           </DialogDescription>
         </DialogHeader>
         <div className="py-4 h-[300px] w-full">
@@ -155,7 +130,7 @@ export function ClubTimelineDialog({ club, isOpen, onOpenChange }: ClubTimelineD
              <Alert className="h-full flex flex-col justify-center items-center">
                 <Icons.barChartBig className="h-6 w-6 mb-2 text-muted-foreground" />
                 <AlertTitle>No Data Available</AlertTitle>
-                <AlertDescription>Not enough recent visit data to generate a crowd timeline for this club.</AlertDescription>
+                <AlertDescription>Not enough recent heartbeat data to generate a crowd timeline for this club.</AlertDescription>
             </Alert>
           )}
           {!isLoading && !error && timelineData.length > 0 && (
@@ -166,7 +141,7 @@ export function ClubTimelineDialog({ club, isOpen, onOpenChange }: ClubTimelineD
                 <YAxis allowDecimals={false} width={30} tick={{ fontSize: 10 }} />
                 <Tooltip contentStyle={{ fontSize: '12px', padding: '5px 10px' }} />
                 <Legend wrapperStyle={{ fontSize: '12px' }} />
-                <Bar dataKey="visitors" fill="hsl(var(--primary))" name="Average Entries" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="visitors" fill="hsl(var(--primary))" name="Average Heartbeats" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           )}

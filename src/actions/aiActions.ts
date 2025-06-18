@@ -3,96 +3,52 @@
 import { estimateWaitTime as estimateWaitTimeFlow, type EstimateWaitTimeInput } from '@/ai/flows/estimate-wait-time';
 import { firestore } from '@/lib/firebase';
 import { collection, query, where, getDocs, orderBy, limit, Timestamp } from 'firebase/firestore';
-import type { Visit } from '@/types';
+import type { HeartbeatEntry } from '@/types'; // Changed from Visit to HeartbeatEntry
 
-// Mock historical data for specific mock club IDs in Johannesburg
-const mockClubVisitHistory: Record<string, Partial<Visit>[]> = {
-  'mock-club-1': [ // Sanctuary Mandela
-    // Simulate weekend pattern - busier Fri/Sat nights
-    // Friday night (5 days ago if today is Wednesday for example)
-    { entryTimestamp: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000 - (24-21) * 60 * 60 * 1000).toISOString(), exitTimestamp: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000 - (24-23) * 60 * 60 * 1000).toISOString() }, // 9 PM - 11 PM
-    { entryTimestamp: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000 - (24-22) * 60 * 60 * 1000).toISOString(), exitTimestamp: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000 - (24-24) * 60 * 60 * 1000).toISOString() }, // 10 PM - 12 AM
-    // Saturday night (4 days ago)
-    { entryTimestamp: new Date(Date.now() - 4 * 24 * 60 * 60 * 1000 - (24-20) * 60 * 60 * 1000).toISOString(), exitTimestamp: new Date(Date.now() - 4 * 24 * 60 * 60 * 1000 - (24-22) * 60 * 60 * 1000).toISOString() }, // 8 PM - 10 PM
-    { entryTimestamp: new Date(Date.now() - 4 * 24 * 60 * 60 * 1000 - (24-23) * 60 * 60 * 1000).toISOString(), exitTimestamp: new Date(Date.now() - 4 * 24 * 60 * 60 * 1000 - (24-25) * 60 * 60 * 1000).toISOString() }, // 11 PM - 1 AM
-  ],
-  'mock-club-2': [ // Truth Nightclub
-    // Simulate late night techno club pattern
-    // Friday (5 days ago)
-    { entryTimestamp: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000 - (24-23) * 60 * 60 * 1000).toISOString(), exitTimestamp: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000 - (24-26) * 60 * 60 * 1000).toISOString() }, // 11 PM - 2 AM
-    { entryTimestamp: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000 - (24-24) * 60 * 60 * 1000).toISOString(), exitTimestamp: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000 - (24-27) * 60 * 60 * 1000).toISOString() }, // 12 AM - 3 AM
-    // Saturday (4 days ago)
-    { entryTimestamp: new Date(Date.now() - 4 * 24 * 60 * 60 * 1000 - (24-22) * 60 * 60 * 1000).toISOString(), exitTimestamp: new Date(Date.now() - 4 * 24 * 60 * 60 * 1000 - (24-25) * 60 * 60 * 1000).toISOString() }, // 10 PM - 1 AM
-  ],
-  'mock-club-4': [ // And Club (Packed)
-    // Consistently busy on weekends
-    // Friday (5 days ago)
-    { entryTimestamp: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000 - (24-22) * 60 * 60 * 1000).toISOString(), exitTimestamp: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000 - (24-25) * 60 * 60 * 1000).toISOString() }, // 10 PM - 1 AM
-    // Saturday (4 days ago)
-    { entryTimestamp: new Date(Date.now() - 4 * 24 * 60 * 60 * 1000 - (24-21) * 60 * 60 * 1000).toISOString(), exitTimestamp: new Date(Date.now() - 4 * 24 * 60 * 60 * 1000 - (24-24) * 60 * 60 * 1000).toISOString() }, // 9 PM - 12 AM
-    // Current day, recent activity
-    { entryTimestamp: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(), exitTimestamp: new Date(Date.now() - 0.5 * 60 * 60 * 1000).toISOString() }, // 2 hours ago, 1.5hr duration
-  ],
-};
-
-
+// This function now aims to get recent heartbeat data rather than full visit logs.
+// The AI prompt might need adjustment if it was expecting longer visit durations.
 async function getHistoricalDataForClub(clubId: string): Promise<string> {
   if (!firestore) {
-    console.warn("Firestore not initialized in getHistoricalDataForClub.");
-    // If Firestore isn't available, and it's a mock club, provide mock data.
-    if (mockClubVisitHistory[clubId]) {
-      console.log(`Firestore unavailable, providing mock visit history for mock club ${clubId}`);
-      return JSON.stringify(mockClubVisitHistory[clubId].map(v => ({
-        entry: v.entryTimestamp,
-        exit: v.exitTimestamp,
-        userId: v.userId || 'mock-user', // Add userId if available in mock, else default
-      })));
-    }
+    console.warn("Firestore not initialized in getHistoricalDataForClub. Returning empty data.");
     return JSON.stringify([]);
   }
 
   try {
-    const visitsRef = collection(firestore, 'visits');
+    const heartbeatsRef = collection(firestore, 'visits'); // 'visits' collection stores heartbeats
+    // Fetch recent heartbeats, e.g., last 24 hours, to get an idea of recent activity patterns
+    const twentyFourHoursAgo = Timestamp.fromMillis(Date.now() - 24 * 60 * 60 * 1000);
     const q = query(
-      visitsRef,
+      heartbeatsRef,
       where('clubId', '==', clubId),
-      orderBy('entryTimestamp', 'desc'),
-      limit(50) 
+      where('lastSeen', '>=', twentyFourHoursAgo), // Focus on recent heartbeats
+      orderBy('lastSeen', 'desc'),
+      limit(100) // Limit to a reasonable number of recent heartbeats
     );
     const querySnapshot = await getDocs(q);
 
-    if (querySnapshot.empty && mockClubVisitHistory[clubId]) {
-      console.log(`No real visit history for ${clubId}, providing mock visit history.`);
-      return JSON.stringify(mockClubVisitHistory[clubId].map(v => ({
-        entry: v.entryTimestamp,
-        exit: v.exitTimestamp,
-        userId: v.userId || 'mock-user',
-      })));
+    if (querySnapshot.empty) {
+      console.log(`No recent heartbeat data for ${clubId}, returning empty array.`);
+      return JSON.stringify([]);
     }
 
-    const visits = querySnapshot.docs.map(doc => {
-      const data = doc.data() as Visit;
-      const entryTimestamp = data.entryTimestamp instanceof Timestamp ? data.entryTimestamp.toDate().toISOString() : (typeof data.entryTimestamp === 'string' ? data.entryTimestamp : new Date().toISOString());
-      const exitTimestamp = data.exitTimestamp ? (data.exitTimestamp instanceof Timestamp ? data.exitTimestamp.toDate().toISOString() : (typeof data.exitTimestamp === 'string' ? data.exitTimestamp : null) ) : null;
+    const heartbeats = querySnapshot.docs.map(doc => {
+      const data = doc.data() as HeartbeatEntry; // Using HeartbeatEntry
+      const lastSeenTimestamp = data.lastSeen instanceof Timestamp 
+        ? data.lastSeen.toDate().toISOString() 
+        : (typeof data.lastSeen === 'string' ? data.lastSeen : new Date().toISOString());
       
+      // For the AI, we might represent each heartbeat as a point-in-time presence
       return {
-        entry: entryTimestamp,
-        exit: exitTimestamp,
-        userId: data.userId, // Include userId from Firestore
+        deviceId: doc.id, // The deviceId is the document ID
+        clubId: data.clubId,
+        location: data.location,
+        timestamp: lastSeenTimestamp, 
       };
     });
-    return JSON.stringify(visits);
+    return JSON.stringify(heartbeats);
   } catch (error) {
-    console.error(`Error fetching historical data for club ${clubId}:`, error);
-    if (mockClubVisitHistory[clubId]) {
-      console.log(`Error fetching real history for ${clubId}, providing mock visit history as fallback.`);
-      return JSON.stringify(mockClubVisitHistory[clubId].map(v => ({
-        entry: v.entryTimestamp,
-        exit: v.exitTimestamp,
-        userId: v.userId || 'mock-user',
-      })));
-    }
-    return JSON.stringify([]);
+    console.error(`Error fetching historical heartbeat data for club ${clubId}:`, error);
+    return JSON.stringify([]); // Return empty on error
   }
 }
 
@@ -103,21 +59,21 @@ export async function getEstimatedWaitTime(clubId: string, currentCount: number)
     const input: EstimateWaitTimeInput = {
       clubId,
       currentCount,
-      historicalData,
+      // The historicalData format has changed. The AI prompt might need to be updated
+      // to understand that this data now represents individual heartbeats/presence points
+      // rather than entry/exit visit durations.
+      historicalData, 
     };
     const result = await estimateWaitTimeFlow(input);
     return { success: true, data: result };
   } catch (error) {
     console.error("Error estimating wait time via AI flow:", error);
     const errorMessage = (typeof error === 'object' && error !== null && 'message' in error) ? String(error.message) : "Failed to estimate wait time due to an unknown error.";
-    // Provide a mock estimation if it's a known mock club and AI fails
-    if (['mock-club-1', 'mock-club-2', 'mock-club-3', 'mock-club-4'].includes(clubId)) {
-        let mockWait = "5-10 min";
-        if (currentCount > 100) mockWait = "15-25 min";
-        if (currentCount > 150) mockWait = "30-45 min";
-         return { success: true, data: { estimatedWaitTime: `~${mockWait} (Sample)` } };
-    }
-    return { success: false, error: errorMessage };
+    // Fallback logic to a simple estimation if AI fails, not mock club specific
+    let basicWait = "5-15 min";
+    if (currentCount > 100) basicWait = "20-30 min";
+    if (currentCount > 150) basicWait = "35-50 min";
+    if (currentCount <=10) basicWait = "No Wait";
+    return { success: true, data: { estimatedWaitTime: `~${basicWait} (Default Estimate)` }, error: `AI estimation failed: ${errorMessage}. Using default.` };
   }
 }
-
