@@ -32,12 +32,6 @@ export default function LandingPage() {
                 <Icons.martini className="mr-2" /> Get Started
               </Link>
             </Button>
-            <Button variant="outline" size="lg" className="text-primary-foreground border-primary-foreground hover:bg-primary-foreground/10 w-full sm:w-auto" asChild>
-              <Link href="#download-ios">Download for iOS</Link>
-            </Button>
-            <Button variant="outline" size="lg" className="text-primary-foreground border-primary-foreground hover:bg-primary-foreground/10 w-full sm:w-auto" asChild>
-              <Link href="#download-android">Download for Android</Link>
-            </Button>
           </div>
         </div>
       </section>
