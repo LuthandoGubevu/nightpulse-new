@@ -1,6 +1,7 @@
+
 {
-  "name": "Club Crowd",
-  "short_name": "Crowd",
+  "name": "NightPulse",
+  "short_name": "NightPulse",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#000000",
