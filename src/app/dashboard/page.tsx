@@ -22,6 +22,8 @@ import { useGeofenceAutoCheckin } from "@/hooks/useGeofenceAutoCheckin";
 import { useHeartbeatTracker } from "@/hooks/useHeartbeatTracker";
 import { getLiveClubCounts } from "@/actions/clubActions"; 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { usePwaInstall } from "@/hooks/usePwaInstall";
+import { PwaInstallPrompt } from "@/components/common/PwaInstallPrompt";
 
 function DashboardLoadingSkeleton() {
   return (
@@ -77,6 +79,8 @@ export default function DashboardPage() {
   const [liveClubCounts, setLiveClubCounts] = useState<Record<string, number>>({});
   const [pollingLocationForGeofence, setPollingLocationForGeofence] = useState(false);
   const [firestoreError, setFirestoreError] = useState<string | null>(null);
+
+  const { showInstallPrompt, handleInstallClick, handleDismissClick } = usePwaInstall();
 
 
   useEffect(() => {
@@ -307,6 +311,13 @@ export default function DashboardPage() {
         title="Nightclub Dashboard"
         description="Find real-time crowd levels, wait times, and vibes for nightclubs."
       />
+
+      {showInstallPrompt && (
+        <PwaInstallPrompt
+          onInstall={handleInstallClick}
+          onDismiss={handleDismissClick}
+        />
+      )}
 
       {firestoreError && (
         <Alert variant="destructive" className="my-4">
