@@ -8,6 +8,7 @@ import { ThemeProvider } from '@/components/theme-provider';
 import { siteConfig } from '@/config/site';
 import AppShell from '@/components/layout/AppShell';
 import { SidebarProvider } from "@/components/ui/sidebar"; // New import
+import Script from 'next/script'; // Import Script component
 
 const fontInter = Inter({
   subsets: ['latin'],
@@ -25,6 +26,7 @@ export const metadata: Metadata = {
     template: `%s | ${siteConfig.name}`,
   },
   description: siteConfig.description,
+  manifest: "/manifest.webmanifest",
   // icons: {
   //   icon: "/favicon.ico",
   //   shortcut: "/favicon-16x16.png",
@@ -36,7 +38,7 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   themeColor: [
     { media: "(prefers-color-scheme: light)", color: "white" },
-    { media: "(prefers-color-scheme: dark)", color: "black" },
+    { media: "(prefers-color-scheme: dark)", color: "#0F172A" },
   ],
 }
 
@@ -71,6 +73,19 @@ export default function RootLayout({
           </SidebarProvider>
           <Toaster />
         </ThemeProvider>
+        <Script id="service-worker-registration">
+          {`
+            if ('serviceWorker' in navigator) {
+              window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/sw.js').then(registration => {
+                  console.log('SW registered: ', registration);
+                }).catch(registrationError => {
+                  console.log('SW registration failed: ', registrationError);
+                });
+              });
+            }
+          `}
+        </Script>
       </body>
     </html>
   );
