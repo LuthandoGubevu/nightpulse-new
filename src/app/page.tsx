@@ -1,22 +1,33 @@
 
+"use client";
+
 import Link from 'next/link';
-import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { Icons } from '@/components/icons';
 import { siteConfig } from '@/config/site';
 import { Smartphone, Activity, PartyPopper, CheckCircle2, Facebook, Twitter, Instagram, Linkedin } from 'lucide-react';
+import { usePwaInstall } from "@/hooks/usePwaInstall";
+import { PwaInstallPrompt } from "@/components/common/PwaInstallPrompt";
 
 export default function LandingPage() {
+  const { showInstallPrompt, handleInstallClick, handleDismissClick } = usePwaInstall();
+
   return (
     <div className="flex flex-col min-h-screen bg-background text-foreground">
+      {/* PWA Install Prompt */}
+      {showInstallPrompt && (
+        <PwaInstallPrompt
+          onInstall={handleInstallClick}
+          onDismiss={handleDismissClick}
+        />
+      )}
+      
       {/* Hero Section */}
       <section
         className="relative py-20 md:py-32 text-center text-primary-foreground bg-cover bg-center bg-no-repeat"
         style={{ backgroundImage: "url('/hero-image.jpg')" }}
       >
-        {/* Color background overlay with 50% opacity */}
         <div className="absolute inset-0 bg-gradient-to-br from-primary via-purple-700 to-purple-900 opacity-50"></div>
-        {/* Original darkening and blur overlay */}
         <div className="absolute inset-0 bg-black/30 backdrop-blur-sm"></div>
         
         <div className="container relative z-10">
