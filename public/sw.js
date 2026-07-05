@@ -1,4 +1,4 @@
-const CACHE_NAME = 'nightpulse-v1';
+const CACHE_NAME = 'nightpulse-v2';
 const urlsToCache = [
   '/',
   '/dashboard',
@@ -28,6 +28,18 @@ self.addEventListener('install', event => {
 });
 
 self.addEventListener('fetch', event => {
+  // Only ever intercept same-origin GET requests. POST requests (Server Actions like
+  // form submissions and data fetches) can't be cached and must reach the network
+  // untouched, and cross-origin requests (e.g. Firebase's securetoken.googleapis.com
+  // token refresh) should never be proxied through the SW at all — doing so breaks
+  // both in ways that surface as generic "Failed to fetch" errors.
+  if (event.request.method !== 'GET') {
+    return;
+  }
+  if (new URL(event.request.url).origin !== self.location.origin) {
+    return;
+  }
+
   event.respondWith(
     caches.match(event.request)
       .then(response => {
