@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/button";
 import { Icons } from "@/components/icons";
 import { useToast } from "@/hooks/use-toast";
 import { deleteClubAction } from "@/actions/clubActions";
+import { auth } from "@/lib/firebase";
 
 interface DeleteClubDialogProps {
   clubId: string;
@@ -31,7 +32,17 @@ export function DeleteClubDialog({ clubId, clubName, onDeleted, children }: Dele
 
   const handleDelete = async () => {
     setIsDeleting(true);
-    const result = await deleteClubAction(clubId);
+    const idToken = await auth?.currentUser?.getIdToken();
+    if (!idToken) {
+      toast({
+        title: "Not Signed In",
+        description: "Please sign in as an admin before deleting a club.",
+        variant: "destructive",
+      });
+      setIsDeleting(false);
+      return;
+    }
+    const result = await deleteClubAction(idToken, clubId);
     setIsDeleting(false);
 
     if (result.success) {

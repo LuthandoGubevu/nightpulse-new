@@ -1,9 +1,10 @@
 
 "use client";
 
-import React from "react";
-import { usePathname } from "next/navigation"; // Removed useRouter
+import React, { useMemo } from "react";
+import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
+import { signOut } from "firebase/auth";
 import {
   Sidebar,
   SidebarContent,
@@ -18,12 +19,13 @@ import {
 import { siteConfig } from "@/config/site";
 import { Icons } from "@/components/icons";
 import { ThemeToggle } from "@/components/theme-toggle";
-// import { useAuth } from "@/hooks/useAuth"; // No longer using for Sign In/Out buttons
-// import { auth } from "@/lib/firebase"; // No longer using for Sign In/Out buttons
-// import { signOut } from "firebase/auth"; // No longer using for Sign In/Out buttons
+import { useAuth } from "@/hooks/useAuth";
+import { auth } from "@/lib/firebase";
 import { useToast } from "@/hooks/use-toast";
+import { Button } from "@/components/ui/button";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 
-// const ADMIN_EMAIL = "lgubevu@gmail.com"; // No longer used here
+const ADMIN_EMAIL = "lgubevu@gmail.com";
 
 interface AppShellProps {
   children: React.ReactNode;
@@ -31,38 +33,37 @@ interface AppShellProps {
 
 export default function AppShell({ children }: AppShellProps) {
   const pathname = usePathname();
-  // const router = useRouter(); // No longer needed for sign out redirection
-  // const { user, loading: authLoading } = useAuth(); // No longer used for conditional UI here
-  const { toast } = useToast(); // Keep for other potential toasts
+  const router = useRouter();
+  const { user, loading: authLoading } = useAuth();
+  const { toast } = useToast();
 
-  // const handleSignOut = async () => {
-  //   if (!auth) { // auth is removed from firebase.ts
-  //     toast({ title: "Error", description: "Firebase Auth not initialized.", variant: "destructive" });
-  //     return;
-  //   }
-  //   try {
-  //     await signOut(auth);
-  //     toast({ title: "Signed Out", description: "You have been successfully signed out." });
-  //     router.push("/");
-  //     router.refresh();
-  //   } catch (error: any) {
-  //     const errorMessage = error.message || "Could not sign out.";
-  //     toast({ title: "Sign Out Failed", description: errorMessage, variant: "destructive" });
-  //   }
-  // };
+  const handleSignOut = async () => {
+    if (!auth) {
+      toast({ title: "Error", description: "Firebase Auth not initialized.", variant: "destructive" });
+      return;
+    }
+    try {
+      await signOut(auth);
+      toast({ title: "Signed Out", description: "You have been successfully signed out." });
+      router.push("/");
+      router.refresh();
+    } catch (error: any) {
+      const errorMessage = error.message || "Could not sign out.";
+      toast({ title: "Sign Out Failed", description: errorMessage, variant: "destructive" });
+    }
+  };
 
-  const mainNavItems = siteConfig.mainNav.filter(item => {
+  const mainNavItems = useMemo(() => siteConfig.mainNav.filter(item => {
     if (item.href === "/auth") return false; // Always hide auth link
 
-    // Show home, dashboard, admin clubs, and admin analytics by default
-    if (item.href === "/" || 
-        item.href === "/dashboard" || 
-        item.href === "/admin/clubs" || 
-        item.href === "/admin/analytics") {
-      return true;
+    if (item.href === "/admin/clubs" || item.href === "/admin/analytics") {
+      return !authLoading && !!user && user.email === ADMIN_EMAIL;
     }
-    return true; // Default to showing other items if any
-  });
+    if (item.href === "/dashboard") {
+      return !authLoading && !!user;
+    }
+    return true; // Home (and anything else ungated) always shows
+  }), [user, authLoading]);
 
   const showFullAppLayout = pathname !== "/" && pathname !== "/auth";
 
@@ -94,12 +95,12 @@ export default function AppShell({ children }: AppShellProps) {
           <SidebarContent className="p-2 flex-grow">
             <SidebarMenu>
               {mainNavItems.map((item) => {
-                if (item.href) { // Removed: && !(item.href === "/" && user) 
+                if (item.href) {
                   const IconComponent = item.icon ? Icons[item.icon] : null;
-                  const isItemActive = pathname === item.href || 
+                  const isItemActive = pathname === item.href ||
                                      (item.href?.startsWith("/admin") && pathname.startsWith(item.href)) ||
                                      (item.href === "/dashboard" && pathname === "/dashboard");
-                  
+
                   return (
                     <SidebarMenuItem key={item.title}>
                       <SidebarMenuButton
@@ -126,7 +127,41 @@ export default function AppShell({ children }: AppShellProps) {
                <div className="group-data-[collapsible=icon]:mx-auto">
                  <ThemeToggle />
                </div>
-              {/* Sign In/Out buttons removed */}
+              {authLoading ? (
+                <div className="flex items-center gap-2 px-2">
+                  <Icons.spinner className="h-4 w-4 animate-spin text-muted-foreground" />
+                </div>
+              ) : user ? (
+                <div className="flex items-center justify-between gap-2 px-2">
+                  <div className="flex items-center gap-2 overflow-hidden group-data-[collapsible=icon]:hidden">
+                    <Avatar className="h-7 w-7">
+                      <AvatarFallback>
+                        {(user.displayName || user.email || "?").charAt(0).toUpperCase()}
+                      </AvatarFallback>
+                    </Avatar>
+                    <span className="truncate text-sm text-muted-foreground">
+                      {user.displayName || user.email}
+                    </span>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={handleSignOut}
+                    title="Sign Out"
+                    className="group-data-[collapsible=icon]:mx-auto"
+                  >
+                    <Icons.logOut className="h-4 w-4" />
+                    <span className="sr-only">Sign Out</span>
+                  </Button>
+                </div>
+              ) : (
+                <Button variant="ghost" asChild className="w-full justify-start group-data-[collapsible=icon]:justify-center">
+                  <Link href="/auth">
+                    <Icons.logIn className="h-4 w-4" />
+                    <span className="group-data-[collapsible=icon]:hidden">Sign In</span>
+                  </Link>
+                </Button>
+              )}
             </div>
           </SidebarFooter>
         </Sidebar>

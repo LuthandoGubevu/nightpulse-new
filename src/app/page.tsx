@@ -113,7 +113,7 @@ export default function LandingPage() {
             Get your venue on NightPulse and attract more partygoers. It&apos;s free to list your club and gain visibility!
           </p>
           <Button size="lg" variant="secondary" className="bg-accent hover:bg-accent/90 text-accent-foreground" asChild>
-            <Link href="/admin/clubs">List Your Club</Link>
+            <a href="mailto:hello@nightpulse.app?subject=List%20My%20Club%20on%20NightPulse">List Your Club</a>
           </Button>
         </div>
       </section>

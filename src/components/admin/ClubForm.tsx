@@ -20,6 +20,7 @@ import type { ClubWithId } from "@/types";
 import { addClubAction, updateClubAction } from "@/actions/clubActions";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/hooks/use-toast";
+import { auth } from "@/lib/firebase";
 import { Icons } from "@/components/icons";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { useState, useEffect } from "react";
@@ -230,8 +231,20 @@ export function ClubForm({ club, mode }: ClubFormProps) {
 
   async function onSubmit(data: ClubFormValues) {
     setIsSubmitting(true);
+
+    const idToken = await auth?.currentUser?.getIdToken();
+    if (!idToken) {
+      toast({
+        title: "Not Signed In",
+        description: "Please sign in as an admin before saving a club.",
+        variant: "destructive",
+      });
+      setIsSubmitting(false);
+      return;
+    }
+
     const formData = new FormData();
-    
+
     (Object.keys(data) as Array<keyof ClubFormValues>).forEach((key) => {
         const value = data[key];
         if (value !== undefined && value !== null) {
@@ -240,12 +253,12 @@ export function ClubForm({ club, mode }: ClubFormProps) {
             formData.append(key, ''); // Send empty string if null for Zod transform
         }
     });
-    
+
     let result;
     if (mode === "edit" && club) {
-      result = await updateClubAction(club.id, formData);
+      result = await updateClubAction(idToken, club.id, formData);
     } else {
-      result = await addClubAction(formData);
+      result = await addClubAction(idToken, formData);
     }
     setIsSubmitting(false);
 

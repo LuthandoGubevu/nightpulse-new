@@ -2,9 +2,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { firestore } from "@/lib/firebase";
-import { collection, onSnapshot, query, where, getDocs, Timestamp } from "firebase/firestore";
-import type { ClubWithId, HeartbeatEntry } from "@/types"; // Changed Visit to HeartbeatEntry
+import { firestore, auth } from "@/lib/firebase";
+import { collection, onSnapshot, query } from "firebase/firestore";
+import type { ClubWithId } from "@/types";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Icons } from "@/components/icons";
 import { HourlyVisitorsChart } from "./HourlyVisitorsChart";
@@ -12,18 +12,18 @@ import { BusiestDayChart } from "./BusiestDayChart";
 import { VisitMetricsWidget } from "./VisitMetricsWidget";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { getLiveClubCounts } from "@/actions/clubActions";
+import { getLiveClubCounts, getRecentHeartbeats, type HeartbeatRecord } from "@/actions/clubActions";
 
 
 // Process hourly data based on heartbeat timestamps
-async function processHourlyData(heartbeats: HeartbeatEntry[]): Promise<any[]> {
+async function processHourlyData(heartbeats: HeartbeatRecord[]): Promise<any[]> {
     const hourlyCounts: { [key: string]: number } = {};
     for (let i = 0; i < 24; i++) {
         hourlyCounts[i.toString().padStart(2, '0') + ":00"] = 0;
     }
     heartbeats.forEach(hb => {
         if (hb.lastSeen) {
-            const entryDate = hb.lastSeen instanceof Timestamp ? hb.lastSeen.toDate() : new Date(hb.lastSeen as string);
+            const entryDate = new Date(hb.lastSeen);
             const hour = entryDate.getHours().toString().padStart(2, '0') + ":00";
             hourlyCounts[hour] = (hourlyCounts[hour] || 0) + 1; // Count each heartbeat
         }
@@ -32,14 +32,14 @@ async function processHourlyData(heartbeats: HeartbeatEntry[]): Promise<any[]> {
 }
 
 // Process busiest day based on heartbeat timestamps
-async function processBusiestDayData(heartbeats: HeartbeatEntry[]): Promise<any[]> {
+async function processBusiestDayData(heartbeats: HeartbeatRecord[]): Promise<any[]> {
     const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
     const dailyCounts: { [key: string]: number } = {};
     days.forEach(day => dailyCounts[day] = 0);
 
     heartbeats.forEach(hb => {
          if (hb.lastSeen) {
-            const entryDate = hb.lastSeen instanceof Timestamp ? hb.lastSeen.toDate() : new Date(hb.lastSeen as string);
+            const entryDate = new Date(hb.lastSeen);
             const dayName = days[entryDate.getDay()];
             if(dayName) dailyCounts[dayName] = (dailyCounts[dayName] || 0) + 1; // Count each heartbeat
         }
@@ -49,7 +49,7 @@ async function processBusiestDayData(heartbeats: HeartbeatEntry[]): Promise<any[
 
 // Process visit metrics might be less meaningful with only heartbeats (no explicit exit times)
 // For now, focusing on new vs returning based on unique device IDs seen. Avg duration is N/A.
-async function processVisitMetrics(heartbeats: HeartbeatEntryWithDeviceId[]): Promise<{ avgDuration: string; newVsReturning: { new: number; returning: number } }> {
+async function processVisitMetrics(heartbeats: HeartbeatRecord[]): Promise<{ avgDuration: string; newVsReturning: { new: number; returning: number } }> {
     const deviceVisits: { [key: string]: number } = {}; // deviceId -> count of heartbeats
 
     heartbeats.forEach(hb => {
@@ -73,11 +73,6 @@ async function processVisitMetrics(heartbeats: HeartbeatEntryWithDeviceId[]): Pr
         avgDuration: `N/A (Heartbeats)`,
         newVsReturning: { new: newVisitors, returning: returningVisitors }
     };
-}
-
-// Add deviceId to HeartbeatEntry for processingVisitMetrics
-interface HeartbeatEntryWithDeviceId extends HeartbeatEntry {
-  deviceId: string;
 }
 
 export function AnalyticsDashboardClient() {
@@ -134,33 +129,18 @@ export function AnalyticsDashboardClient() {
   useEffect(() => {
     async function fetchHistoricalData() {
       setLoadingHistorical(true);
-      let heartbeatsToProcess: HeartbeatEntryWithDeviceId[] = [];
+      let heartbeatsToProcess: HeartbeatRecord[] = [];
 
-      if (!firestore) {
-        setHourlyData([]);
-        setBusiestDayData([]);
-        setVisitMetrics({ avgDuration: "N/A", newVsReturning: { new: 0, returning: 0 }});
-        setTotalHeartbeats(0);
-        setLoadingHistorical(false);
-        setFirestoreError("Firebase Firestore is not available for analytics data. Please check configuration.");
-        return;
-      }
       setFirestoreError(null);
       try {
-        const visitsRef = collection(firestore, "visits"); 
-        const thirtyDaysAgo = new Date();
-        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-        
-        const heartbeatsQuery = query(visitsRef, where("lastSeen", ">=", Timestamp.fromDate(thirtyDaysAgo)));
-
-        const snapshot = await getDocs(heartbeatsQuery);
-        if (snapshot.empty) {
-          // No error, just no data
+        const idToken = await auth?.currentUser?.getIdToken();
+        if (!idToken) {
+          setFirestoreError("You must be signed in as an admin to view analytics.");
         } else {
-          heartbeatsToProcess = snapshot.docs.map(doc => ({
-             ...(doc.data() as HeartbeatEntry), 
-             deviceId: doc.id 
-            }));
+          const thirtyDaysAgo = new Date();
+          thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+          heartbeatsToProcess = await getRecentHeartbeats(idToken, thirtyDaysAgo.getTime());
         }
       } catch (error) {
         console.error("Error fetching historical heartbeat data for analytics:", error);

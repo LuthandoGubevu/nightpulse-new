@@ -1,7 +1,8 @@
 
 "use client"; 
 
-import React, { useEffect, useState, useMemo, useCallback, useRef } from "react";
+import React, { Suspense, useEffect, useState, useMemo, useCallback, useRef } from "react";
+import { useSearchParams } from "next/navigation";
 import { collection, onSnapshot, orderBy, query, Timestamp } from "firebase/firestore";
 import { firestore } from "@/lib/firebase";
 import type { ClubWithId, UserLocation } from "@/types";
@@ -24,6 +25,23 @@ import { getLiveClubCounts } from "@/actions/clubActions";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { usePwaInstall } from "@/hooks/usePwaInstall";
 import { PwaInstallPrompt } from "@/components/common/PwaInstallPrompt";
+
+function AccessDeniedNotice() {
+  const searchParams = useSearchParams();
+  const { toast } = useToast();
+
+  useEffect(() => {
+    if (searchParams.get("error") === "access_denied") {
+      toast({
+        title: "Access Denied",
+        description: "You do not have permission to view that section.",
+        variant: "destructive",
+      });
+    }
+  }, [searchParams, toast]);
+
+  return null;
+}
 
 function DashboardLoadingSkeleton() {
   return (
@@ -307,6 +325,9 @@ export default function DashboardPage() {
   
   return (
     <div className="container mx-auto py-8 px-4">
+      <Suspense fallback={null}>
+        <AccessDeniedNotice />
+      </Suspense>
       <PageHeader
         title="Nightclub Dashboard"
         description="Find real-time crowd levels, wait times, and vibes for nightclubs."
