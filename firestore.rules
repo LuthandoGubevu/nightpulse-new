@@ -5,22 +5,27 @@ service cloud.firestore {
   match /databases/{database}/documents {
 
     // Clubs collection:
-    // - Public read access (this app has no Firebase Auth).
-    // - Public write access for now, because admin CRUD (add/update/delete club)
-    //   still runs through the client Firestore SDK with no auth check.
-    //   CAUTION: this means anyone can modify or delete any club. Lock this down
-    //   once admin actions are migrated to the Admin SDK with their own server-side check.
+    // - Any logged-in user (email/password or Google) can read club data.
+    // - Only the admin account can create, update, or delete clubs. email_verified is
+    //   required in addition to the email match, since email/password signup alone
+    //   doesn't prove mailbox ownership (only Firebase's global email-uniqueness does) —
+    //   Google sign-in satisfies this automatically. Note: the admin write actions in
+    //   clubActions.ts run through the Admin SDK, which bypasses these rules entirely and
+    //   performs its own equivalent verifyIdToken check server-side — this rule is the
+    //   defense-in-depth backstop, not the only enforcement point.
     match /clubs/{clubId} {
-      allow read: if true;
-      allow write: if true;
+      allow read: if request.auth != null;
+      allow write: if request.auth != null
+                   && request.auth.token.email == 'lgubevu@gmail.com'
+                   && request.auth.token.email_verified == true;
     }
 
     // Visits collection (heartbeats):
-    // - All reads and writes now go exclusively through trusted server-side code
+    // - All reads and writes go exclusively through trusted server-side code
     //   (the /api/heartbeat route and Server Actions) using the Firebase Admin SDK,
     //   which bypasses these rules entirely.
-    // - No direct client access is permitted, since this app has no Firebase Auth and
-    //   these documents contain raw device IDs and precise location data.
+    // - No direct client access is permitted, since these documents contain raw
+    //   device IDs and precise location data.
     match /visits/{visitId} {
       allow read, write: if false;
     }

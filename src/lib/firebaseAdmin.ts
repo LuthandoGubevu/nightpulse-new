@@ -1,9 +1,11 @@
 
 import { initializeApp, getApps, cert, type App } from "firebase-admin/app";
 import { getFirestore, type Firestore } from "firebase-admin/firestore";
+import { getAuth, type Auth } from "firebase-admin/auth";
 
 let adminApp: App | undefined;
 let adminFirestore: Firestore | undefined;
+let adminAuth: Auth | undefined;
 
 function loadServiceAccount(): Record<string, unknown> | null {
   const base64 = process.env.FIREBASE_SERVICE_ACCOUNT_KEY_BASE64;
@@ -27,10 +29,11 @@ if (serviceAccount) {
   try {
     adminApp = getApps().length ? getApps()[0]! : initializeApp({ credential: cert(serviceAccount as any) });
     adminFirestore = getFirestore(adminApp);
-    console.info("✅ Firebase Admin app and firestore initialized.");
+    adminAuth = getAuth(adminApp);
+    console.info("✅ Firebase Admin app, firestore, and auth initialized.");
   } catch (e: any) {
     console.error("🔴 Firebase Admin initialization failed:", e.message);
   }
 }
 
-export { adminApp, adminFirestore };
+export { adminApp, adminFirestore, adminAuth };

@@ -1,10 +1,12 @@
 
 import { initializeApp, getApps, type FirebaseApp } from "firebase/app";
 import { getFirestore, type Firestore } from "firebase/firestore";
+import { getAuth, type Auth } from "firebase/auth";
 // import { getAnalytics } from "firebase/analytics";
 
 let app: FirebaseApp | undefined;
 let firestore: Firestore | undefined;
+let auth: Auth | undefined;
 // let analytics;
 
 const getFirebaseConfig = () => ({
@@ -57,13 +59,15 @@ if (configProblems.length > 0) {
   );
   app = undefined;
   firestore = undefined;
+  auth = undefined;
 } else {
   if (!getApps().length) {
     try {
       console.info("Attempting to initialize Firebase app with provided configuration...");
-      app = initializeApp(firebaseConfig as any); 
+      app = initializeApp(firebaseConfig as any);
       firestore = getFirestore(app);
-      console.info("✅ Firebase app and firestore services initialized on server.");
+      auth = getAuth(app);
+      console.info("✅ Firebase app, firestore, and auth services initialized on server.");
       // if (firebaseConfig.measurementId && !String(firebaseConfig.measurementId).startsWith("YOUR_")) {
       //   analytics = getAnalytics(app);
       // }
@@ -71,11 +75,13 @@ if (configProblems.length > 0) {
       console.error("🔴 Firebase initialization failed unexpectedly, even with seemingly valid config values. Error:", e.message);
       app = undefined;
       firestore = undefined;
+      auth = undefined;
     }
   } else {
     app = getApps()[0]!;
     firestore = getFirestore(app);
-    console.info("✅ Firebase app and firestore services re-used existing initialization on server.");
+    auth = getAuth(app);
+    console.info("✅ Firebase app, firestore, and auth services re-used existing initialization on server.");
     // if (firebaseConfig.measurementId && !String(firebaseConfig.measurementId).startsWith("YOUR_") && app) {
     //   analytics = getAnalytics(app);
     // }
@@ -83,15 +89,16 @@ if (configProblems.length > 0) {
 }
 
 // Log the status of services post-attempt
-if (configProblems.length > 0 || !app || !firestore) {
+if (configProblems.length > 0 || !app || !firestore || !auth) {
     if (!app) console.error("🔴 Final status: Firebase App (app) is undefined on the server.");
     if (!firestore) console.error("🔴 Final status: Firebase Firestore (firestore) is undefined on the server.");
+    if (!auth) console.error("🔴 Final status: Firebase Auth (auth) is undefined on the server.");
 } else {
-    console.info("✅ Final status: Firebase app and firestore services appear to be correctly initialized on the server.");
+    console.info("✅ Final status: Firebase app, firestore, and auth services appear to be correctly initialized on the server.");
 }
 
 
-export { app, firestore }; // Removed auth export
+export { app, auth, firestore };
 
 // Helper to convert Firestore Timestamps to Dates safely
 export const transformTimestamp = (timestamp: any) => {

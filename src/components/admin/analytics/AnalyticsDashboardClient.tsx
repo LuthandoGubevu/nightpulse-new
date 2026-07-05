@@ -2,7 +2,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { firestore } from "@/lib/firebase";
+import { firestore, auth } from "@/lib/firebase";
 import { collection, onSnapshot, query } from "firebase/firestore";
 import type { ClubWithId } from "@/types";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -133,10 +133,15 @@ export function AnalyticsDashboardClient() {
 
       setFirestoreError(null);
       try {
-        const thirtyDaysAgo = new Date();
-        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+        const idToken = await auth?.currentUser?.getIdToken();
+        if (!idToken) {
+          setFirestoreError("You must be signed in as an admin to view analytics.");
+        } else {
+          const thirtyDaysAgo = new Date();
+          thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
-        heartbeatsToProcess = await getRecentHeartbeats(thirtyDaysAgo.getTime());
+          heartbeatsToProcess = await getRecentHeartbeats(idToken, thirtyDaysAgo.getTime());
+        }
       } catch (error) {
         console.error("Error fetching historical heartbeat data for analytics:", error);
         setFirestoreError("Failed to load analytics data from Firestore.");
