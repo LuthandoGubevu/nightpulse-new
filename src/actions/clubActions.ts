@@ -3,7 +3,9 @@
 
 import { revalidatePath } from "next/cache";
 import { firestore } from "@/lib/firebase";
+import { adminFirestore } from "@/lib/firebaseAdmin";
 import { collection, addDoc, doc, updateDoc, deleteDoc, Timestamp, getDoc, getDocs, query, where } from "firebase/firestore";
+import { Timestamp as AdminTimestamp } from "firebase-admin/firestore";
 import type { Club, HeartbeatEntry } from "@/types";
 import { z } from "zod";
 import { parseCommaSeparatedString } from "@/lib/utils";
@@ -231,18 +233,19 @@ export async function getClubById(clubId: string): Promise<Club | null> {
  * @returns A Promise resolving to an object mapping clubId to its live count.
  */
 export async function getLiveClubCounts(): Promise<Record<string, number>> {
-  if (!firestore) {
-    console.warn("Firestore not initialized in getLiveClubCounts. Returning empty counts.");
+  if (!adminFirestore) {
+    console.warn("Firestore admin not initialized in getLiveClubCounts. Returning empty counts.");
     return {};
   }
 
   const liveCounts: Record<string, number> = {};
-  const fiveAndHalfMinutesAgo = Timestamp.fromMillis(Date.now() - 5.5 * 60 * 1000);
+  const fiveAndHalfMinutesAgo = AdminTimestamp.fromMillis(Date.now() - 5.5 * 60 * 1000);
 
   try {
-    const visitsRef = collection(firestore, 'visits');
-    const q = query(visitsRef, where('lastSeen', '>=', fiveAndHalfMinutesAgo));
-    const querySnapshot = await getDocs(q);
+    const querySnapshot = await adminFirestore
+      .collection('visits')
+      .where('lastSeen', '>=', fiveAndHalfMinutesAgo)
+      .get();
 
     querySnapshot.forEach((docSnap) => {
       const visitData = docSnap.data() as Partial<HeartbeatEntry>; // Partial because deviceId is doc ID
@@ -255,5 +258,43 @@ export async function getLiveClubCounts(): Promise<Record<string, number>> {
   } catch (error) {
     console.error('Error fetching live club counts:', error);
     return {}; // Return empty or cached counts on error
+  }
+}
+
+export interface HeartbeatRecord {
+  deviceId: string;
+  clubId: string;
+  lastSeen: string; // ISO string
+}
+
+/**
+ * Fetches heartbeats recorded since the given timestamp, for client-side analytics
+ * (hourly/daily breakdowns, new-vs-returning device counts, etc.).
+ * Runs through the Admin SDK so it works regardless of Firestore client rules.
+ */
+export async function getRecentHeartbeats(sinceMillis: number): Promise<HeartbeatRecord[]> {
+  if (!adminFirestore) {
+    console.warn("Firestore admin not initialized in getRecentHeartbeats. Returning empty list.");
+    return [];
+  }
+
+  try {
+    const querySnapshot = await adminFirestore
+      .collection('visits')
+      .where('lastSeen', '>=', AdminTimestamp.fromMillis(sinceMillis))
+      .get();
+
+    return querySnapshot.docs.map((docSnap) => {
+      const data = docSnap.data() as Partial<HeartbeatEntry>;
+      const lastSeen = data.lastSeen instanceof AdminTimestamp ? data.lastSeen.toDate().toISOString() : new Date().toISOString();
+      return {
+        deviceId: docSnap.id,
+        clubId: data.clubId || "",
+        lastSeen,
+      };
+    });
+  } catch (error) {
+    console.error('Error fetching recent heartbeats:', error);
+    return [];
   }
 }
