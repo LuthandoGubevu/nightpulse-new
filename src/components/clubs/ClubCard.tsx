@@ -11,7 +11,7 @@ import { getClubStatus } from "@/lib/utils";
 import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { ClubTimelineDialog } from "./ClubTimelineDialog"; 
-import type { Timestamp } from "firebase/firestore"; // Keep type import if used
+import { Timestamp } from "firebase/firestore";
 
 interface ClubCardProps {
   club: ClubWithId; 

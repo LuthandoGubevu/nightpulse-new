@@ -34,11 +34,11 @@ criticalConfigMappings.forEach(mapping => {
   const value = firebaseConfig[mapping.key];
   let problemMessage = "";
 
-  if (value === undefined) { 
+  if (value === undefined) {
     problemMessage = `${mapping.envVarName} is missing or undefined. Ensure it is set in your .env file and the server has been restarted.`;
   } else if (String(value).trim() === "") {
     problemMessage = `${mapping.envVarName} is empty. Please provide a value.`;
-  } else if (String(value).startsWith(mapping.placeholderPrefix.substring(0, 5))) { 
+  } else if (String(value).startsWith(mapping.placeholderPrefix.substring(0, 5))) {
     problemMessage = `${mapping.envVarName} appears to use a placeholder value (e.g., starts with "${mapping.placeholderPrefix.substring(0, 5)}"). Please use your actual Firebase credential.`;
   }
 
@@ -47,8 +47,16 @@ criticalConfigMappings.forEach(mapping => {
   }
 });
 
-
-if (configProblems.length > 0) {
+// This SDK is only ever used from "use client" components (see every importer of this
+// file), and all real Firestore/Auth calls happen inside useEffect/event handlers, which
+// never run during server-side rendering. Skip initialization entirely on the server so
+// its Node-environment code paths (e.g. @firebase/firestore's optional gRPC transport)
+// never get evaluated/bundled into the server build — only the browser needs this.
+if (typeof window === "undefined") {
+  app = undefined;
+  firestore = undefined;
+  auth = undefined;
+} else if (configProblems.length > 0) {
   console.warn(
     "🔴 Firebase is not properly configured. The following issues were found with your environment variables (check your .env file and ensure the server was restarted after changes):"
   );
@@ -67,7 +75,7 @@ if (configProblems.length > 0) {
       app = initializeApp(firebaseConfig as any);
       firestore = getFirestore(app);
       auth = getAuth(app);
-      console.info("✅ Firebase app, firestore, and auth services initialized on server.");
+      console.info("✅ Firebase app, firestore, and auth services initialized.");
       // if (firebaseConfig.measurementId && !String(firebaseConfig.measurementId).startsWith("YOUR_")) {
       //   analytics = getAnalytics(app);
       // }
@@ -81,20 +89,22 @@ if (configProblems.length > 0) {
     app = getApps()[0]!;
     firestore = getFirestore(app);
     auth = getAuth(app);
-    console.info("✅ Firebase app, firestore, and auth services re-used existing initialization on server.");
+    console.info("✅ Firebase app, firestore, and auth services re-used existing initialization.");
     // if (firebaseConfig.measurementId && !String(firebaseConfig.measurementId).startsWith("YOUR_") && app) {
     //   analytics = getAnalytics(app);
     // }
   }
 }
 
-// Log the status of services post-attempt
-if (configProblems.length > 0 || !app || !firestore || !auth) {
-    if (!app) console.error("🔴 Final status: Firebase App (app) is undefined on the server.");
-    if (!firestore) console.error("🔴 Final status: Firebase Firestore (firestore) is undefined on the server.");
-    if (!auth) console.error("🔴 Final status: Firebase Auth (auth) is undefined on the server.");
-} else {
-    console.info("✅ Final status: Firebase app, firestore, and auth services appear to be correctly initialized on the server.");
+// Log the status of services post-attempt (client-side only; server intentionally skips init)
+if (typeof window !== "undefined") {
+  if (configProblems.length > 0 || !app || !firestore || !auth) {
+      if (!app) console.error("🔴 Final status: Firebase App (app) is undefined.");
+      if (!firestore) console.error("🔴 Final status: Firebase Firestore (firestore) is undefined.");
+      if (!auth) console.error("🔴 Final status: Firebase Auth (auth) is undefined.");
+  } else {
+      console.info("✅ Final status: Firebase app, firestore, and auth services appear to be correctly initialized.");
+  }
 }
 
 

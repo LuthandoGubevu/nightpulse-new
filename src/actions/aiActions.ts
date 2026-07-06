@@ -1,6 +1,6 @@
 
 "use server";
-import { estimateWaitTime as estimateWaitTimeFlow, type EstimateWaitTimeInput } from '@/ai/flows/estimate-wait-time';
+import type { EstimateWaitTimeInput } from '@/ai/flows/estimate-wait-time';
 import { adminFirestore } from '@/lib/firebaseAdmin';
 import { Timestamp } from 'firebase-admin/firestore';
 import type { HeartbeatEntry } from '@/types'; // Changed from Visit to HeartbeatEntry
@@ -53,15 +53,19 @@ async function getHistoricalDataForClub(clubId: string): Promise<string> {
 export async function getEstimatedWaitTime(clubId: string, currentCount: number) {
   try {
     const historicalData = await getHistoricalDataForClub(clubId);
-    
+
     const input: EstimateWaitTimeInput = {
       clubId,
       currentCount,
       // The historicalData format has changed. The AI prompt might need to be updated
       // to understand that this data now represents individual heartbeats/presence points
       // rather than entry/exit visit durations.
-      historicalData, 
+      historicalData,
     };
+    // Loaded dynamically so the Genkit/Handlebars dependency chain is only evaluated
+    // when this feature is actually invoked, not on every page that merely references
+    // this action (e.g. the dashboard's WaitTimeDialog).
+    const { estimateWaitTime: estimateWaitTimeFlow } = await import('@/ai/flows/estimate-wait-time');
     const result = await estimateWaitTimeFlow(input);
     return { success: true, data: result };
   } catch (error) {
