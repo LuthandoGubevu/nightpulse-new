@@ -1,7 +1,6 @@
 
 import { adminAuth } from "@/lib/firebaseAdmin";
-
-export const ADMIN_EMAIL = "lgubevu@gmail.com";
+import { isAdminEmail } from "@/lib/adminEmails";
 
 export type AdminVerificationResult =
   | { ok: true; uid: string }
@@ -31,7 +30,7 @@ export async function verifyAdminIdToken(idToken: unknown): Promise<AdminVerific
     return { ok: false, error: "Invalid or expired session. Please sign in again." };
   }
 
-  if (decoded.email !== ADMIN_EMAIL || decoded.email_verified !== true) {
+  if (!isAdminEmail(decoded.email) || decoded.email_verified !== true) {
     return { ok: false, error: "Not authorized." };
   }
 
