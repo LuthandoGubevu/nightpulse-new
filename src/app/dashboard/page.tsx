@@ -17,8 +17,6 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { haversineDistance, getClubStatus } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
-import { Switch } from "@/components/ui/switch";
-import { Label } from "@/components/ui/label";
 import { useGeofenceAutoCheckin } from "@/hooks/useGeofenceAutoCheckin";
 import { useHeartbeatTracker } from "@/hooks/useHeartbeatTracker";
 import { getLiveClubCounts } from "@/actions/clubActions"; 
@@ -43,7 +41,7 @@ function AccessDeniedNotice() {
   return null;
 }
 
-const AUTO_PRESENCE_STORAGE_KEY = "nightpulse_auto_presence_enabled";
+type LocationStatus = "locating" | "active" | "denied" | "unavailable";
 
 function DashboardLoadingSkeleton() {
   return (
@@ -89,15 +87,13 @@ export default function DashboardPage() {
   const [allClubs, setAllClubs] = useState<ClubWithId[]>([]);
   const [loadingClubs, setLoadingClubs] = useState(true);
   const [userLocation, setUserLocation] = useState<UserLocation | null>(null);
-  const [locationLoading, setLocationLoading] = useState(false);
-  const [sortBy, setSortBy] = useState<string>("default"); 
-  const [filterTags, setFilterTags] = useState<string[]>([]); 
-  
-  const [isAutoPresenceEnabled, setIsAutoPresenceEnabled] = useState(false);
+  const [locationStatus, setLocationStatus] = useState<LocationStatus>("locating");
+  const [sortBy, setSortBy] = useState<string>("default");
+  const [filterTags, setFilterTags] = useState<string[]>([]);
+
   const [activeGeofenceClubId, setActiveGeofenceClubId] = useState<string | null>(null);
-  
+
   const [liveClubCounts, setLiveClubCounts] = useState<Record<string, number>>({});
-  const [pollingLocationForGeofence, setPollingLocationForGeofence] = useState(false);
   const [firestoreError, setFirestoreError] = useState<string | null>(null);
 
   const { showInstallPrompt, handleInstallClick, handleDismissClick } = usePwaInstall();
@@ -180,17 +176,19 @@ export default function DashboardPage() {
     setActiveGeofenceClubId(clubId);
   }, []);
   
+  const isTrackingActive = locationStatus === "active";
+
   const { locationError: geofenceLocationError } = useGeofenceAutoCheckin({
     clubs: allClubs,
-    isEnabled: isAutoPresenceEnabled && pollingLocationForGeofence, 
+    isEnabled: isTrackingActive,
     userLocation: userLocation,
     onGeofenceChange: handleGeofenceChange,
   });
-  
+
   useHeartbeatTracker({
-    clubId: activeGeofenceClubId, 
+    clubId: activeGeofenceClubId,
     userLocation: userLocation,
-    isEnabled: isAutoPresenceEnabled && !!activeGeofenceClubId, 
+    isEnabled: isTrackingActive && !!activeGeofenceClubId,
   });
   
   useEffect(() => {
@@ -200,83 +198,71 @@ export default function DashboardPage() {
   }, [geofenceLocationError, toast]);
 
   const watchIdRef = useRef<number | null>(null);
+  const errorToastShownRef = useRef(false);
+  const hasAutoSortedRef = useRef(false);
 
-  const startLocationPolling = useCallback((silent = false) => {
-    if (navigator.geolocation && !watchIdRef.current) {
-      setPollingLocationForGeofence(true);
-      setLocationLoading(true);
-      watchIdRef.current = navigator.geolocation.watchPosition(
-        (position) => {
-          setUserLocation({ lat: position.coords.latitude, lng: position.coords.longitude });
-          setLocationLoading(false);
-        },
-        (error) => {
-          console.error("Error watching user location:", error);
-          toast({ title: "Location Watch Error", description: `Could not watch your location: ${error.message}. Auto features may be limited.`, variant: "destructive" });
-          setLocationLoading(false);
-          setPollingLocationForGeofence(false);
-          if (watchIdRef.current) navigator.geolocation.clearWatch(watchIdRef.current);
-          watchIdRef.current = null;
-          setIsAutoPresenceEnabled(false);
-          if (typeof window !== "undefined") {
-            localStorage.removeItem(AUTO_PRESENCE_STORAGE_KEY);
+  const beginLocationTracking = useCallback(() => {
+    if (!navigator.geolocation) {
+      setLocationStatus("unavailable");
+      return;
+    }
+    if (watchIdRef.current !== null) return;
+
+    setLocationStatus("locating");
+    watchIdRef.current = navigator.geolocation.watchPosition(
+      (position) => {
+        setUserLocation({ lat: position.coords.latitude, lng: position.coords.longitude });
+        setLocationStatus("active");
+        if (!hasAutoSortedRef.current) {
+          hasAutoSortedRef.current = true;
+          setSortBy("nearby");
+        }
+      },
+      (error) => {
+        console.error("Error watching user location:", error);
+        if (error.code === error.PERMISSION_DENIED) {
+          setLocationStatus("denied");
+          if (watchIdRef.current !== null) {
+            navigator.geolocation.clearWatch(watchIdRef.current);
+            watchIdRef.current = null;
           }
-        },
-        { enableHighAccuracy: true, maximumAge: 10000, timeout: 15000, distanceFilter: 10 }
-      );
-      if (!silent) {
-        toast({ title: "Location Tracking Started", description: "App will now monitor your location for auto-presence." });
-      }
-    }
+        } else {
+          // Transient (TIMEOUT / POSITION_UNAVAILABLE) — leave the watch running so the
+          // browser can recover on its own instead of forcing the user back through a
+          // manual re-enable flow for a temporary GPS hiccup.
+          setLocationStatus("unavailable");
+        }
+        if (!errorToastShownRef.current) {
+          errorToastShownRef.current = true;
+          toast({
+            title: error.code === error.PERMISSION_DENIED ? "Location Access Off" : "Location Unavailable",
+            description:
+              error.code === error.PERMISSION_DENIED
+                ? "Enable location for this site in your browser settings to get nearby sorting and auto check-in."
+                : `Could not determine your location: ${error.message}`,
+            variant: "destructive",
+          });
+        }
+      },
+      { enableHighAccuracy: true, maximumAge: 10000, timeout: 15000, distanceFilter: 10 }
+    );
   }, [toast]);
 
-  const stopLocationPolling = useCallback(() => {
-    if (watchIdRef.current && navigator.geolocation) {
-      navigator.geolocation.clearWatch(watchIdRef.current);
-      watchIdRef.current = null;
-    }
-    setPollingLocationForGeofence(false);
-    toast({ title: "Location Tracking Stopped", description: "Auto-presence features are now paused." });
-  }, [toast]);
-
-  // Once the browser has actually granted location permission and the user has opted
-  // into Auto Presence, resume it silently on every subsequent visit instead of making
-  // them click "Use My Location" and re-toggle it every time the page/PWA reloads.
+  // Start tracking unconditionally on mount — calling watchPosition itself triggers the
+  // browser's native permission prompt with no button click required, and silently
+  // resumes on later visits where permission was already granted. No localStorage
+  // involved: the browser is the source of truth for permission state.
   useEffect(() => {
-    if (typeof window === "undefined") return;
-    const wasEnabled = localStorage.getItem(AUTO_PRESENCE_STORAGE_KEY) === "true";
-    if (wasEnabled) {
-      setIsAutoPresenceEnabled(true);
-      startLocationPolling(true);
-    }
-    // Intentionally run once on mount only.
+    beginLocationTracking();
+    return () => {
+      if (watchIdRef.current !== null && navigator.geolocation) {
+        navigator.geolocation.clearWatch(watchIdRef.current);
+        watchIdRef.current = null;
+      }
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const handleGetUserLocationOnce = () => {
-    if (navigator.geolocation) {
-      setLocationLoading(true);
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          setUserLocation({ lat: position.coords.latitude, lng: position.coords.longitude });
-          setLocationLoading(false);
-          setSortBy("nearby");
-          toast({ title: "Location Found", description: "Sorting clubs by your location. You can now enable Auto Presence." });
-          if (isAutoPresenceEnabled && !pollingLocationForGeofence) {
-             startLocationPolling();
-          }
-        },
-        (error) => {
-          console.error("Error getting user location:", error);
-          toast({ title: "Location Error", description: `Could not get your location: ${error.message}`, variant: "destructive" });
-          setLocationLoading(false);
-        }
-      );
-    } else {
-      toast({ title: "Location Not Supported", description: "Geolocation is not supported by your browser.", variant: "destructive" });
-    }
-  };
-  
   const clubsWithLiveCountsAndDistance = useMemo(() => {
     let clubsToProcess = allClubs.map(club => ({
       ...club,
@@ -307,43 +293,14 @@ export default function DashboardPage() {
 
 
   const handleSortChange = (value: string) => {
-    if (value === "nearby" && !userLocation && !locationLoading) {
-      handleGetUserLocationOnce(); 
-    } else {
-      setSortBy(value);
-    }
+    setSortBy(value);
   };
 
   const handleFilterChange = (value: string) => {
     setFilterTags(value === "all" ? [] : [value]);
   };
 
-  const handleAutoPresenceToggle = (checked: boolean) => {
-    if (checked && !userLocation) {
-      toast({ title: "Location Needed", description: "Please 'Use My Location' first to enable Auto Presence.", variant: "default" });
-      setIsAutoPresenceEnabled(false);
-      return;
-    }
-    setIsAutoPresenceEnabled(checked);
-    if (typeof window !== "undefined") {
-      localStorage.setItem(AUTO_PRESENCE_STORAGE_KEY, checked ? "true" : "false");
-    }
-    if (checked) {
-      startLocationPolling();
-    } else {
-      stopLocationPolling();
-    }
-  };
-
-  useEffect(() => {
-    return () => {
-      if (watchIdRef.current && navigator.geolocation) {
-        navigator.geolocation.clearWatch(watchIdRef.current);
-      }
-    };
-  }, []);
-
-  if (loadingClubs) { 
+  if (loadingClubs) {
     return <DashboardLoadingSkeleton />;
   }
   
@@ -375,24 +332,40 @@ export default function DashboardPage() {
       )}
 
       <div className="my-6 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-        <Button 
-          onClick={handleGetUserLocationOnce} 
-          disabled={locationLoading} 
-          variant="outline"
-          className="w-full md:w-auto"
-        >
-          {locationLoading ? <Icons.spinner className="mr-2 h-4 w-4 animate-spin" /> : <Icons.navigation className="mr-2 h-4 w-4" />}
-          {userLocation ? "Update My Location" : "Use My Location"}
-        </Button>
-        
-        <div className="flex flex-col sm:flex-row gap-2 w-full md:w-auto"> 
+        {locationStatus !== "active" && (
+          <div className="flex items-center gap-2 text-sm text-muted-foreground w-full md:w-auto">
+            {locationStatus === "locating" && (
+              <>
+                <Icons.spinner className="h-4 w-4 animate-spin" />
+                <span>Locating you…</span>
+              </>
+            )}
+            {locationStatus === "denied" && (
+              <>
+                <Icons.warning className="h-4 w-4 text-destructive" />
+                <span>Location is off — enable it in your browser&apos;s site settings for nearby sorting &amp; auto check-in.</span>
+              </>
+            )}
+            {locationStatus === "unavailable" && (
+              <>
+                <Icons.warning className="h-4 w-4 text-amber-500" />
+                <span>Can&apos;t get a location fix right now.</span>
+                <Button variant="link" size="sm" className="h-auto p-0" onClick={beginLocationTracking}>
+                  Retry
+                </Button>
+              </>
+            )}
+          </div>
+        )}
+
+        <div className="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
           <Select value={sortBy} onValueChange={handleSortChange}>
             <SelectTrigger className="w-full">
               <SelectValue placeholder="Sort by..." />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="default">Sort: Default</SelectItem>
-              <SelectItem value="nearby" disabled={!userLocation && !locationLoading}>Sort: Nearby</SelectItem>
+              <SelectItem value="nearby" disabled={!userLocation}>Sort: Nearby</SelectItem>
               <SelectItem value="crowded">Sort: Most Crowded</SelectItem>
             </SelectContent>
           </Select>
@@ -408,17 +381,6 @@ export default function DashboardPage() {
               <SelectItem value="rooftop">Filter: Rooftop</SelectItem>
             </SelectContent>
           </Select>
-        </div>
-        <div className="flex items-center space-x-2 w-full md:w-auto justify-start md:justify-end">
-          <Switch
-            id="auto-presence-toggle"
-            checked={isAutoPresenceEnabled}
-            onCheckedChange={handleAutoPresenceToggle}
-            disabled={!userLocation && !isAutoPresenceEnabled} 
-          />
-          <Label htmlFor="auto-presence-toggle" className={(!userLocation && !isAutoPresenceEnabled) ? 'text-muted-foreground' : ''}>
-            Auto Presence
-          </Label>
         </div>
       </div>
 
