@@ -43,6 +43,8 @@ function AccessDeniedNotice() {
   return null;
 }
 
+const AUTO_PRESENCE_STORAGE_KEY = "nightpulse_auto_presence_enabled";
+
 function DashboardLoadingSkeleton() {
   return (
     <div className="container mx-auto py-8 px-4">
@@ -199,14 +201,14 @@ export default function DashboardPage() {
 
   const watchIdRef = useRef<number | null>(null);
 
-  const startLocationPolling = useCallback(() => {
+  const startLocationPolling = useCallback((silent = false) => {
     if (navigator.geolocation && !watchIdRef.current) {
       setPollingLocationForGeofence(true);
-      setLocationLoading(true); 
+      setLocationLoading(true);
       watchIdRef.current = navigator.geolocation.watchPosition(
         (position) => {
           setUserLocation({ lat: position.coords.latitude, lng: position.coords.longitude });
-          setLocationLoading(false); 
+          setLocationLoading(false);
         },
         (error) => {
           console.error("Error watching user location:", error);
@@ -216,10 +218,15 @@ export default function DashboardPage() {
           if (watchIdRef.current) navigator.geolocation.clearWatch(watchIdRef.current);
           watchIdRef.current = null;
           setIsAutoPresenceEnabled(false);
+          if (typeof window !== "undefined") {
+            localStorage.removeItem(AUTO_PRESENCE_STORAGE_KEY);
+          }
         },
         { enableHighAccuracy: true, maximumAge: 10000, timeout: 15000, distanceFilter: 10 }
       );
-      toast({ title: "Location Tracking Started", description: "App will now monitor your location for auto-presence." });
+      if (!silent) {
+        toast({ title: "Location Tracking Started", description: "App will now monitor your location for auto-presence." });
+      }
     }
   }, [toast]);
 
@@ -231,6 +238,20 @@ export default function DashboardPage() {
     setPollingLocationForGeofence(false);
     toast({ title: "Location Tracking Stopped", description: "Auto-presence features are now paused." });
   }, [toast]);
+
+  // Once the browser has actually granted location permission and the user has opted
+  // into Auto Presence, resume it silently on every subsequent visit instead of making
+  // them click "Use My Location" and re-toggle it every time the page/PWA reloads.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const wasEnabled = localStorage.getItem(AUTO_PRESENCE_STORAGE_KEY) === "true";
+    if (wasEnabled) {
+      setIsAutoPresenceEnabled(true);
+      startLocationPolling(true);
+    }
+    // Intentionally run once on mount only.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleGetUserLocationOnce = () => {
     if (navigator.geolocation) {
@@ -300,10 +321,13 @@ export default function DashboardPage() {
   const handleAutoPresenceToggle = (checked: boolean) => {
     if (checked && !userLocation) {
       toast({ title: "Location Needed", description: "Please 'Use My Location' first to enable Auto Presence.", variant: "default" });
-      setIsAutoPresenceEnabled(false); 
+      setIsAutoPresenceEnabled(false);
       return;
     }
     setIsAutoPresenceEnabled(checked);
+    if (typeof window !== "undefined") {
+      localStorage.setItem(AUTO_PRESENCE_STORAGE_KEY, checked ? "true" : "false");
+    }
     if (checked) {
       startLocationPolling();
     } else {
