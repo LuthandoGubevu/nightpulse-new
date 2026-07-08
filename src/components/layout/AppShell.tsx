@@ -24,8 +24,7 @@ import { auth } from "@/lib/firebase";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-
-const ADMIN_EMAIL = "lgubevu@gmail.com";
+import { isAdminEmail } from "@/lib/adminEmails";
 
 interface AppShellProps {
   children: React.ReactNode;
@@ -57,7 +56,7 @@ export default function AppShell({ children }: AppShellProps) {
     if (item.href === "/auth") return false; // Always hide auth link
 
     if (item.href === "/admin/clubs" || item.href === "/admin/analytics") {
-      return !authLoading && !!user && user.email === ADMIN_EMAIL;
+      return !authLoading && !!user && isAdminEmail(user.email);
     }
     if (item.href === "/dashboard") {
       return !authLoading && !!user;

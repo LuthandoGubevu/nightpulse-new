@@ -35,6 +35,24 @@ const nextConfig: NextConfig = {
       },
     ],
   },
+  async headers() {
+    // Netlify applies a strict Cross-Origin-Opener-Policy by default, which blocks
+    // Firebase Auth's signInWithPopup from detecting when the popup window closes
+    // (it needs window.closed access on a cross-origin popup). Relax it site-wide to
+    // the popup-compatible variant, which still isolates the browsing context from
+    // other cross-origin windows otherwise.
+    return [
+      {
+        source: '/:path*',
+        headers: [
+          {
+            key: 'Cross-Origin-Opener-Policy',
+            value: 'same-origin-allow-popups',
+          },
+        ],
+      },
+    ];
+  },
 };
 
 export default nextConfig;
