@@ -1,4 +1,4 @@
-const CACHE_NAME = 'nightpulse-v2';
+const CACHE_NAME = 'nightpulse-v3';
 const urlsToCache = [
   '/',
   '/dashboard',
@@ -17,7 +17,9 @@ const urlsToCache = [
 ];
 
 self.addEventListener('install', event => {
-  // Perform install steps
+  // Take over from any previously-registered SW as soon as this one finishes installing,
+  // instead of waiting for every open tab/installed-PWA instance to fully close first.
+  self.skipWaiting();
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then(cache => {
@@ -40,6 +42,18 @@ self.addEventListener('fetch', event => {
     return;
   }
 
+  // Navigations (HTML documents) go network-first: a cached HTML shell references a
+  // specific build's JS chunk hashes, which no longer exist once a new version deploys,
+  // so serving it cache-first crashes the app. Only fall back to the cache if the
+  // network is genuinely unreachable (offline).
+  if (event.request.mode === 'navigate') {
+    event.respondWith(
+      fetch(event.request).catch(() => caches.match(event.request))
+    );
+    return;
+  }
+
+  // Static assets (icons, manifest, hashed JS/CSS) are safe to serve cache-first.
   event.respondWith(
     caches.match(event.request)
       .then(response => {
