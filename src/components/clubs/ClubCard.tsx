@@ -1,26 +1,19 @@
 
 "use client";
 
-import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardTitle, CardDescription } from "@/components/ui/card";
 import { Icons } from "@/components/icons";
 import { ClubStatusIndicator } from "./ClubStatusIndicator";
-import { WaitTimeDialog } from "./WaitTimeDialog";
 import type { ClubWithId, ClubStatus } from "@/types";
 import { getClubStatus } from "@/lib/utils";
-import { useState } from "react";
 import { Badge } from "@/components/ui/badge";
-import { ClubTimelineDialog } from "./ClubTimelineDialog"; 
 import { Timestamp } from "firebase/firestore";
 
 interface ClubCardProps {
-  club: ClubWithId; 
+  club: ClubWithId;
 }
 
 export function ClubCard({ club }: ClubCardProps) {
-  const [isWaitTimeDialogOpen, setIsWaitTimeDialogOpen] = useState(false);
-  const [isTimelineDialogOpen, setIsTimelineDialogOpen] = useState(false); 
-
   const status: ClubStatus = getClubStatus(club.currentCount, club.capacityThresholds);
 
   const statusTextMap: Record<ClubStatus, string> = {
@@ -43,8 +36,7 @@ export function ClubCard({ club }: ClubCardProps) {
   };
 
   return (
-    <>
-      <Card className="flex flex-col overflow-hidden shadow-lg hover:shadow-xl transition-shadow duration-300">
+    <Card className="flex flex-col overflow-hidden shadow-lg hover:shadow-xl transition-shadow duration-300">
         <CardContent className="p-6 flex-grow space-y-3">
           <div className="flex justify-between items-start">
             <CardTitle className="text-2xl font-headline mb-1">{club.name}</CardTitle>
@@ -108,35 +100,7 @@ export function ClubCard({ club }: ClubCardProps) {
               ))}
             </div>
           )}
-        </CardContent>
-        <CardFooter className="p-4 border-t">
-           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 w-full">
-            <Button onClick={() => setIsWaitTimeDialogOpen(true)} variant="outline" className="w-full">
-              <Icons.clock className="mr-2 h-4 w-4" />
-              AI Wait Time
-            </Button>
-            <Button onClick={() => setIsTimelineDialogOpen(true)} variant="outline" className="w-full">
-              <Icons.barChartBig className="mr-2 h-4 w-4" />
-              Crowd Timeline
-            </Button>
-          </div>
-        </CardFooter>
-      </Card>
-
-      {isWaitTimeDialogOpen && (
-        <WaitTimeDialog
-          club={club}
-          isOpen={isWaitTimeDialogOpen}
-          onOpenChange={setIsWaitTimeDialogOpen}
-        />
-      )}
-      {isTimelineDialogOpen && (
-        <ClubTimelineDialog 
-          club={club}
-          isOpen={isTimelineDialogOpen}
-          onOpenChange={setIsTimelineDialogOpen}
-        />
-      )}
-    </>
+      </CardContent>
+    </Card>
   );
 }

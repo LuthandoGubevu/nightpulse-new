@@ -7,8 +7,6 @@ import { mapConfig } from '@/config';
 import { Button } from '@/components/ui/button';
 import { Icons } from '@/components/icons';
 import { CustomMapControl } from './CustomMapControl';
-import { useState } from 'react';
-import { WaitTimeDialog } from './WaitTimeDialog';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 interface ClubMapWrapperProps {
@@ -16,12 +14,6 @@ interface ClubMapWrapperProps {
 }
 
 export default function ClubMapWrapper({ clubs }: ClubMapWrapperProps) {
-  const [selectedClubForWaitTime, setSelectedClubForWaitTime] = useState<ClubWithId | null>(null);
-
-  const handleWaitTimeClick = (club: ClubWithId) => {
-    setSelectedClubForWaitTime(club);
-  };
-  
   if (!mapConfig.apiKey) {
     return (
       <Alert variant="destructive" className="flex flex-col items-center justify-center h-96 bg-muted/50 rounded-lg p-8 text-center shadow-inner">
@@ -54,39 +46,30 @@ export default function ClubMapWrapper({ clubs }: ClubMapWrapperProps) {
 
 
   return (
-    <>
-      <APIProvider apiKey={mapConfig.apiKey}>
-        <div style={{ height: "600px", width: "100%" }} className="rounded-lg overflow-hidden shadow-xl border">
-          <Map
-            defaultCenter={center}
-            defaultZoom={mapConfig.defaultZoom}
-            gestureHandling={'greedy'}
-            disableDefaultUI={true}
-            mapId="nightlife_navigator_map"
-            className="dark-map-styles" // Apply custom styles if needed via cloud console
-            fullscreenControl={false}
-            zoomControl={true}
-            streetViewControl={false}
-          >
-            {clubs.map(club => (
-              <ClubMapMarker key={club.id} club={club} onWaitTimeClick={handleWaitTimeClick} />
-            ))}
-            <CustomMapControl controlPosition={ControlPosition.TOP_RIGHT}>
-              <Button variant="outline" size="icon" className="m-2 bg-background hover:bg-muted" onClick={() => console.log("Recenter map") /* Implement recenter functionality */}>
-                <Icons.mapPin className="h-4 w-4" /> 
-                <span className="sr-only">Recenter Map</span>
-              </Button>
-            </CustomMapControl>
-          </Map>
-        </div>
-      </APIProvider>
-      {selectedClubForWaitTime && (
-        <WaitTimeDialog
-          club={selectedClubForWaitTime}
-          isOpen={!!selectedClubForWaitTime}
-          onOpenChange={() => setSelectedClubForWaitTime(null)}
-        />
-      )}
-    </>
+    <APIProvider apiKey={mapConfig.apiKey}>
+      <div style={{ height: "600px", width: "100%" }} className="rounded-lg overflow-hidden shadow-xl border">
+        <Map
+          defaultCenter={center}
+          defaultZoom={mapConfig.defaultZoom}
+          gestureHandling={'greedy'}
+          disableDefaultUI={true}
+          mapId="nightlife_navigator_map"
+          className="dark-map-styles" // Apply custom styles if needed via cloud console
+          fullscreenControl={false}
+          zoomControl={true}
+          streetViewControl={false}
+        >
+          {clubs.map(club => (
+            <ClubMapMarker key={club.id} club={club} />
+          ))}
+          <CustomMapControl controlPosition={ControlPosition.TOP_RIGHT}>
+            <Button variant="outline" size="icon" className="m-2 bg-background hover:bg-muted" onClick={() => console.log("Recenter map") /* Implement recenter functionality */}>
+              <Icons.mapPin className="h-4 w-4" />
+              <span className="sr-only">Recenter Map</span>
+            </Button>
+          </CustomMapControl>
+        </Map>
+      </div>
+    </APIProvider>
   );
 }
