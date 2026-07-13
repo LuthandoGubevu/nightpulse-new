@@ -3,16 +3,14 @@ import { AdvancedMarker, Pin } from '@vis.gl/react-google-maps';
 import type { ClubWithId } from '@/types';
 import { getClubStatus } from '@/lib/utils';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Button } from '@/components/ui/button';
 import { Icons } from '../icons';
 import { ClubStatusIndicator } from './ClubStatusIndicator';
 
 interface ClubMapMarkerProps {
   club: ClubWithId;
-  onWaitTimeClick: (club: ClubWithId) => void;
 }
 
-export function ClubMapMarker({ club, onWaitTimeClick }: ClubMapMarkerProps) {
+export function ClubMapMarker({ club }: ClubMapMarkerProps) {
   if (!club.location) return null;
 
   const status = getClubStatus(club.currentCount, club.capacityThresholds);
@@ -43,9 +41,6 @@ export function ClubMapMarker({ club, onWaitTimeClick }: ClubMapMarkerProps) {
               Current Crowd: {club.currentCount}
               <ClubStatusIndicator status={status} size="sm" />
             </div>
-            <Button size="sm" className="w-full mt-2" onClick={() => onWaitTimeClick(club)}>
-              <Icons.clock className="mr-2 h-4 w-4" /> Estimate Wait Time
-            </Button>
           </div>
         </PopoverContent>
       </Popover>
