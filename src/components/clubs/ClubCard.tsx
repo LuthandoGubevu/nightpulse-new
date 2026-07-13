@@ -1,9 +1,11 @@
 
 "use client";
 
-import { Card, CardContent, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent, CardFooter, CardTitle, CardDescription } from "@/components/ui/card";
 import { Icons } from "@/components/icons";
 import { ClubStatusIndicator } from "./ClubStatusIndicator";
+import { ClubRatingIndicator } from "./ClubRatingIndicator";
+import { SafetyRatingWidget } from "./SafetyRatingWidget";
 import type { ClubWithId, ClubStatus } from "@/types";
 import { getClubStatus } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
@@ -101,6 +103,13 @@ export function ClubCard({ club }: ClubCardProps) {
             </div>
           )}
       </CardContent>
+      <CardFooter className="p-4 border-t flex flex-col items-stretch gap-2">
+        <div className="flex items-center justify-between">
+          <span className="text-sm font-medium text-muted-foreground">Safety Rating</span>
+          <ClubRatingIndicator sum={club.safetyRatingSum ?? 0} count={club.safetyRatingCount ?? 0} size="sm" />
+        </div>
+        <SafetyRatingWidget clubId={club.id} initialRating={club.myRating ?? null} />
+      </CardFooter>
     </Card>
   );
 }
