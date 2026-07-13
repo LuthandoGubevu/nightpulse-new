@@ -20,6 +20,18 @@ service cloud.firestore {
                    && request.auth.token.email_verified == true;
     }
 
+    // Safety ratings subcollection (one vote doc per user per club, doc ID = uid):
+    // - All reads and writes go exclusively through ratingActions.ts using the
+    //   Firebase Admin SDK, which bypasses these rules entirely and atomically keeps
+    //   the per-user vote doc and the parent club's safetyRatingSum/safetyRatingCount
+    //   aggregate in sync inside a transaction. A client trusted to write its own vote
+    //   doc directly could still desync the aggregate on the clubs doc (or write to
+    //   someone else's uid), so this collection is locked down the same way visits is —
+    //   no direct client access at all.
+    match /clubs/{clubId}/safetyRatings/{uid} {
+      allow read, write: if false;
+    }
+
     // Visits collection (heartbeats):
     // - All reads and writes go exclusively through trusted server-side code
     //   (the /api/heartbeat route and Server Actions) using the Firebase Admin SDK,

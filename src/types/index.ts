@@ -24,6 +24,10 @@ export interface Club {
   tonightDJ?: string; // Name of the DJ playing tonight
   announcementMessage?: string; // A promotional message
   announcementExpiresAt?: Timestamp | Date | string | null; // Optional expiry for the announcement
+
+  // Safety rating aggregate — average is derived (sum/count) at render time, never stored
+  safetyRatingSum?: number;
+  safetyRatingCount?: number;
 }
 
 export interface ClubWithId extends Club {
@@ -31,6 +35,7 @@ export interface ClubWithId extends Club {
   // Client-side calculated fields
   distance?: number; // For nearby sorting
   isTrending?: boolean; // For trending display
+  myRating?: number | null; // This signed-in user's own safety-rating vote, if any
 }
 
 // The 'visits' collection will now store heartbeat data.

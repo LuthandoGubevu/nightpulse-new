@@ -4,7 +4,9 @@
 import React, { Suspense, useEffect, useState, useMemo, useCallback, useRef } from "react";
 import { useSearchParams } from "next/navigation";
 import { collection, onSnapshot, orderBy, query, Timestamp } from "firebase/firestore";
-import { firestore } from "@/lib/firebase";
+import { firestore, auth } from "@/lib/firebase";
+import { useAuth } from "@/hooks/useAuth";
+import { getMyRatingsAction } from "@/actions/ratingActions";
 import type { ClubWithId, UserLocation } from "@/types";
 import { ClubList } from "@/components/clubs/ClubList";
 import { PageHeader } from "@/components/common/PageHeader";
@@ -84,6 +86,7 @@ function DashboardLoadingSkeleton() {
 
 export default function DashboardPage() {
   const { toast } = useToast();
+  const { user } = useAuth();
   const [allClubs, setAllClubs] = useState<ClubWithId[]>([]);
   const [loadingClubs, setLoadingClubs] = useState(true);
   const [userLocation, setUserLocation] = useState<UserLocation | null>(null);
@@ -94,6 +97,7 @@ export default function DashboardPage() {
   const [activeGeofenceClubId, setActiveGeofenceClubId] = useState<string | null>(null);
 
   const [liveClubCounts, setLiveClubCounts] = useState<Record<string, number>>({});
+  const [myRatings, setMyRatings] = useState<Record<string, number>>({});
   const [firestoreError, setFirestoreError] = useState<string | null>(null);
 
   const { showInstallPrompt, handleInstallClick, handleDismissClick } = usePwaInstall();
@@ -135,6 +139,8 @@ export default function DashboardPage() {
           tonightDJ: data.tonightDJ,
           announcementMessage: data.announcementMessage,
           announcementExpiresAt: announcementExpiresAt,
+          safetyRatingSum: data.safetyRatingSum ?? 0,
+          safetyRatingCount: data.safetyRatingCount ?? 0,
           isTrending: getClubStatus(liveClubCounts[doc.id] ?? data.currentCount ?? 0, data.capacityThresholds || {}) === 'packed' || getClubStatus(liveClubCounts[doc.id] ?? data.currentCount ?? 0, data.capacityThresholds || {}) === 'over-packed',
         } as ClubWithId;
       });
@@ -167,10 +173,32 @@ export default function DashboardPage() {
   }, []);
 
   useEffect(() => {
-    fetchLiveCounts(); 
-    const interval = setInterval(fetchLiveCounts, 1 * 60 * 1000); 
+    fetchLiveCounts();
+    const interval = setInterval(fetchLiveCounts, 1 * 60 * 1000);
     return () => clearInterval(interval);
   }, [fetchLiveCounts]);
+
+  // Fetch this user's own safety-rating votes once per login/club-set change (not
+  // polled — this data only changes via the user's own actions, which the
+  // SafetyRatingWidget already reflects optimistically without a refetch).
+  const clubIdsKey = useMemo(() => allClubs.map(c => c.id).sort().join(","), [allClubs]);
+
+  useEffect(() => {
+    if (!user || !clubIdsKey) {
+      setMyRatings({});
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      const idToken = await auth?.currentUser?.getIdToken();
+      if (!idToken || cancelled) return;
+      const ratings = await getMyRatingsAction(idToken, clubIdsKey.split(","));
+      if (!cancelled) setMyRatings(ratings);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [user, clubIdsKey]);
 
   const handleGeofenceChange = useCallback((clubId: string | null) => {
     setActiveGeofenceClubId(clubId);
@@ -270,6 +298,7 @@ export default function DashboardPage() {
       currentCount: liveClubCounts[club.id] ?? club.currentCount ?? 0, 
       isTrending: getClubStatus(liveClubCounts[club.id] ?? club.currentCount ?? 0, club.capacityThresholds || {}) === 'packed' || getClubStatus(liveClubCounts[club.id] ?? club.currentCount ?? 0, club.capacityThresholds || {}) === 'over-packed',
       distance: userLocation && club.location ? haversineDistance(userLocation.lat, userLocation.lng, club.location.lat, club.location.lng) : Infinity,
+      myRating: myRatings[club.id] ?? null,
     }));
 
     if (filterTags.length > 0) {
@@ -289,7 +318,7 @@ export default function DashboardPage() {
         clubsToProcess.sort((a,b) => a.name.localeCompare(b.name));
     }
     return clubsToProcess;
-  }, [allClubs, userLocation, sortBy, filterTags, liveClubCounts]);
+  }, [allClubs, userLocation, sortBy, filterTags, liveClubCounts, myRatings]);
 
 
   const handleSortChange = (value: string) => {
