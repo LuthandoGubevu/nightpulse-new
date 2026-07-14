@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Icons } from '@/components/icons';
 import { siteConfig } from '@/config/site';
-import { Smartphone, Activity, PartyPopper, CheckCircle2, Facebook, Twitter, Instagram, Linkedin } from 'lucide-react';
+import { Smartphone, Activity, PartyPopper, Heart, CheckCircle2, Facebook, Twitter, Instagram, Linkedin } from 'lucide-react';
 import { usePwaInstall } from "@/hooks/usePwaInstall";
 import { PwaInstallPrompt } from "@/components/common/PwaInstallPrompt";
 
@@ -32,10 +32,10 @@ export default function LandingPage() {
         
         <div className="container relative z-10">
           <h1 className="text-5xl md:text-7xl font-bold font-headline mb-6 animate-fade-in-down">
-            Find the Pulse of the Night
+            Feel the Vybe of the Night
           </h1>
           <p className="text-xl md:text-2xl mb-10 max-w-3xl mx-auto animate-fade-in-up">
-            Real-time nightclub crowd insights. Know where the party&apos;s at—before you go.
+            Real-time nightclub crowd insights, plus Meet Me — an opt-in way to meet new people at the venues you&apos;re already at.
           </p>
           <div className="flex flex-col sm:flex-row justify-center items-center space-y-4 sm:space-y-0 sm:space-x-4 animate-fade-in">
             <Button size="lg" className="bg-accent hover:bg-accent/90 text-accent-foreground w-full sm:w-auto" asChild>
@@ -50,12 +50,12 @@ export default function LandingPage() {
       {/* How It Works Section */}
       <section className="py-16 md:py-24 bg-background">
         <div className="container">
-          <h2 className="text-3xl md:text-4xl font-bold font-headline text-center mb-12">How NightPulse Works</h2>
-          <div className="grid md:grid-cols-3 gap-8 md:gap-12 text-center">
+          <h2 className="text-3xl md:text-4xl font-bold font-headline text-center mb-12">How Vybi Works</h2>
+          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-8 md:gap-10 text-center">
             <div className="flex flex-col items-center p-6 bg-card rounded-lg shadow-lg">
               <Smartphone size={48} className="text-accent mb-4" />
               <h3 className="text-xl font-semibold font-headline mb-2">1. Install the App</h3>
-              <p className="text-muted-foreground">Get NightPulse on your iOS or Android device. Quick and easy setup.</p>
+              <p className="text-muted-foreground">Get Vybi on your iOS or Android device. Quick and easy setup.</p>
             </div>
             <div className="flex flex-col items-center p-6 bg-card rounded-lg shadow-lg">
               <Activity size={48} className="text-accent mb-4" />
@@ -63,14 +63,19 @@ export default function LandingPage() {
               <p className="text-muted-foreground">See live data on how busy clubs are, powered by our community.</p>
             </div>
             <div className="flex flex-col items-center p-6 bg-card rounded-lg shadow-lg">
+              <Heart size={48} className="text-accent mb-4" />
+              <h3 className="text-xl font-semibold font-headline mb-2">3. Tap Meet Me</h3>
+              <p className="text-muted-foreground">Opt in when you arrive and meet other people there — for friendship, or something more.</p>
+            </div>
+            <div className="flex flex-col items-center p-6 bg-card rounded-lg shadow-lg">
               <PartyPopper size={48} className="text-accent mb-4" />
-              <h3 className="text-xl font-semibold font-headline mb-2">3. Go Where It&apos;s Lit</h3>
+              <h3 className="text-xl font-semibold font-headline mb-2">4. Go Where It&apos;s Lit</h3>
               <p className="text-muted-foreground">Head straight to the hottest spots and skip the guesswork.</p>
             </div>
           </div>
           <p className="text-center text-muted-foreground mt-10 text-lg">
             <Icons.shieldCheck className="inline h-5 w-5 mr-2 text-green-500" />
-            Your privacy is paramount. No personal info shared. Fully anonymous tracking.
+            Crowd insights are fully anonymous. Meet Me is entirely opt-in — your profile is only ever visible to others who&apos;ve also opted in at the same venue, and you can go invisible any time.
           </p>
         </div>
       </section>
@@ -78,8 +83,8 @@ export default function LandingPage() {
       {/* Benefits Section */}
       <section className="py-16 md:py-24 bg-background">
         <div className="container">
-          <h2 className="text-3xl md:text-4xl font-bold font-headline text-center mb-12">Why You&apos;ll Love NightPulse</h2>
-          <div className="grid md:grid-cols-3 gap-8">
+          <h2 className="text-3xl md:text-4xl font-bold font-headline text-center mb-12">Why You&apos;ll Love Vybi</h2>
+          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-8">
             <div className="flex items-start space-x-4 p-6 bg-card rounded-lg shadow-lg">
               <CheckCircle2 size={36} className="text-accent flex-shrink-0 mt-1" />
               <div>
@@ -92,6 +97,13 @@ export default function LandingPage() {
               <div>
                 <h3 className="text-xl font-semibold font-headline mb-2">Discover Hotspots</h3>
                 <p className="text-muted-foreground">Uncover trending clubs and hidden gems packed with partygoers.</p>
+              </div>
+            </div>
+            <div className="flex items-start space-x-4 p-6 bg-card rounded-lg shadow-lg">
+              <Heart size={36} className="text-accent flex-shrink-0 mt-1" />
+              <div>
+                <h3 className="text-xl font-semibold font-headline mb-2">Meet New People</h3>
+                <p className="text-muted-foreground">Opt in with one tap to meet others at the same venue — friends, or something more.</p>
               </div>
             </div>
             <div className="flex items-start space-x-4 p-6 bg-card rounded-lg shadow-lg">
@@ -110,10 +122,10 @@ export default function LandingPage() {
         <div className="container text-center">
           <h2 className="text-3xl md:text-4xl font-bold font-headline mb-6">Are You a Club Owner?</h2>
           <p className="text-xl mb-8 max-w-2xl mx-auto">
-            Get your venue on NightPulse and attract more partygoers. It&apos;s free to list your club and gain visibility!
+            Get your venue on Vybi and attract more partygoers. It&apos;s free to list your club and gain visibility!
           </p>
           <Button size="lg" variant="secondary" className="bg-accent hover:bg-accent/90 text-accent-foreground" asChild>
-            <a href="mailto:hello@nightpulse.app?subject=List%20My%20Club%20on%20NightPulse">List Your Club</a>
+            <a href="mailto:hello@nightpulse.app?subject=List%20My%20Club%20on%20Vybi">List Your Club</a>
           </Button>
         </div>
       </section>

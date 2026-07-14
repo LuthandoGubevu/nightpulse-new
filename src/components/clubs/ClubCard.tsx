@@ -6,6 +6,7 @@ import { Icons } from "@/components/icons";
 import { ClubStatusIndicator } from "./ClubStatusIndicator";
 import { ClubRatingIndicator } from "./ClubRatingIndicator";
 import { SafetyRatingWidget } from "./SafetyRatingWidget";
+import { MeetMeButton } from "@/components/meetme/MeetMeButton";
 import type { ClubWithId, ClubStatus } from "@/types";
 import { getClubStatus } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
@@ -13,9 +14,10 @@ import { Timestamp } from "firebase/firestore";
 
 interface ClubCardProps {
   club: ClubWithId;
+  isHereNow?: boolean;
 }
 
-export function ClubCard({ club }: ClubCardProps) {
+export function ClubCard({ club, isHereNow = false }: ClubCardProps) {
   const status: ClubStatus = getClubStatus(club.currentCount, club.capacityThresholds);
 
   const statusTextMap: Record<ClubStatus, string> = {
@@ -109,6 +111,11 @@ export function ClubCard({ club }: ClubCardProps) {
           <ClubRatingIndicator sum={club.safetyRatingSum ?? 0} count={club.safetyRatingCount ?? 0} size="sm" />
         </div>
         <SafetyRatingWidget clubId={club.id} initialRating={club.myRating ?? null} />
+        {isHereNow && (
+          <div className="pt-2 border-t">
+            <MeetMeButton clubId={club.id} />
+          </div>
+        )}
       </CardFooter>
     </Card>
   );

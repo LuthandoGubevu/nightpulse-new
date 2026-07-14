@@ -65,3 +65,80 @@ export interface UserLocation {
   lat: number;
   lng: number;
 }
+
+// "Meet Me" feature — user profile, presence, matching, and chat.
+
+export type Gender = "man" | "woman" | "non-binary";
+export type LookingFor = "friends" | "love";
+export type Orientation = "straight" | "gay" | "bisexual";
+
+export interface UserProfile {
+  displayName: string;
+  photoUrl: string | null;
+  age: number;
+  gender: Gender;
+  lookingFor: LookingFor;
+  orientation: Orientation | null; // set only when lookingFor === "love"
+  blockedUids: string[];
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
+}
+
+// clubs/{clubId}/meetMePresence/{uid} — a snapshot of the user's profile taken at
+// opt-in time, not a live join, so the discovery list doesn't need N extra reads.
+export interface MeetMePresence {
+  uid: string;
+  displayName: string;
+  photoUrl: string | null;
+  age: number;
+  gender: Gender;
+  lookingFor: LookingFor;
+  orientation: Orientation | null;
+  createdAt: Timestamp;
+  expiresAt: Timestamp;
+}
+
+export interface MeetMePresenceWithId extends MeetMePresence {
+  id: string; // == uid
+}
+
+// interests/{clubId}_{fromUid}_{toUid}
+export interface Interest {
+  clubId: string;
+  fromUid: string;
+  toUid: string;
+  createdAt: Timestamp;
+}
+
+// conversations/{conversationId}, id = sorted uid pair "{uidA}_{uidB}"
+export interface Conversation {
+  participantUids: [string, string];
+  clubId: string;
+  createdAt: Timestamp;
+  lastMessageAt: Timestamp;
+  lastMessageText: string;
+}
+
+export interface ConversationWithId extends Conversation {
+  id: string;
+}
+
+export interface ChatMessage {
+  senderUid: string;
+  text: string;
+  createdAt: Timestamp;
+}
+
+export interface ChatMessageWithId extends ChatMessage {
+  id: string;
+}
+
+export interface Report {
+  reporterUid: string;
+  reportedUid: string;
+  clubId: string | null;
+  conversationId: string | null;
+  reason: string;
+  createdAt: Timestamp;
+  status: "open";
+}

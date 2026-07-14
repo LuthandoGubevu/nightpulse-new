@@ -134,7 +134,7 @@ export function AuthForm() {
     setIsSubmitting(true);
     try {
       await createUserWithEmailAndPassword(auth, values.email, values.password);
-      toast({ title: "Account Created", description: "Welcome to NightPulse." });
+      toast({ title: "Account Created", description: "Welcome to Vybi." });
       router.push(redirectTo);
     } catch (error: any) {
       toast({ title: "Sign Up Failed", description: mapAuthError(error.code), variant: "destructive" });
@@ -169,7 +169,7 @@ export function AuthForm() {
   return (
     <Card className="w-full">
       <CardHeader>
-        <CardTitle>Welcome to NightPulse</CardTitle>
+        <CardTitle>Welcome to Vybi</CardTitle>
         <CardDescription>Sign in or create an account to continue.</CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">

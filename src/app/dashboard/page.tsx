@@ -423,7 +423,7 @@ export default function DashboardPage() {
           </TabsTrigger>
         </TabsList>
         <TabsContent value="list" className="mt-6">
-           <ClubList clubs={clubsWithLiveCountsAndDistance} />
+           <ClubList clubs={clubsWithLiveCountsAndDistance} activeGeofenceClubId={activeGeofenceClubId} />
         </TabsContent>
         <TabsContent value="map" className="mt-6">
           <ClubMapWrapper clubs={clubsWithLiveCountsAndDistance} />

@@ -4,9 +4,9 @@ import type { Icons } from "@/components/icons";
 export type SiteConfig = typeof siteConfig
 
 export const siteConfig = {
-  name: "NightPulse",
+  name: "Vybi",
   description:
-    "Navigate the night with real-time club crowd data and estimated wait times.",
+    "Real-time nightclub crowd insights, plus Meet Me — an opt-in way to meet friends (or something more) at the venues you're already at.",
   mainNav: [
     {
       title: "Home",
@@ -16,7 +16,12 @@ export const siteConfig = {
     {
       title: "Dashboard",
       href: "/dashboard",
-      icon: "layoutDashboard" as keyof typeof Icons, 
+      icon: "layoutDashboard" as keyof typeof Icons,
+    },
+    {
+      title: "Matches",
+      href: "/dashboard/matches",
+      icon: "heart" as keyof typeof Icons,
     },
     {
       title: "Manage Clubs",

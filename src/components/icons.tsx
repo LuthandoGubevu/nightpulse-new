@@ -45,6 +45,13 @@ import {
   LayoutDashboard, // Added for dashboard icon
   Check, // Added Check icon
   Star,
+  Heart,
+  MessageCircle,
+  Send,
+  Flag,
+  Ban,
+  Camera,
+  UserRound,
 } from "lucide-react"
 
 // A simple Google icon SVG as lucide-react doesn't have one directly
@@ -107,5 +114,12 @@ export const Icons = {
   layoutDashboard: LayoutDashboard,
   check: Check, // Added Check icon export
   star: Star,
+  heart: Heart,
+  messageCircle: MessageCircle,
+  send: Send,
+  flag: Flag,
+  ban: Ban,
+  camera: Camera,
+  userRound: UserRound,
 }
 
