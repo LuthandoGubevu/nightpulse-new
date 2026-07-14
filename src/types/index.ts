@@ -68,9 +68,17 @@ export interface UserLocation {
 
 // "Meet Me" feature — user profile, presence, matching, and chat.
 
+export type Gender = "man" | "woman" | "non-binary";
+export type LookingFor = "friends" | "love";
+export type Orientation = "straight" | "gay" | "bisexual";
+
 export interface UserProfile {
   displayName: string;
   photoUrl: string | null;
+  age: number;
+  gender: Gender;
+  lookingFor: LookingFor;
+  orientation: Orientation | null; // set only when lookingFor === "love"
   blockedUids: string[];
   createdAt: Timestamp;
   updatedAt: Timestamp;
@@ -82,6 +90,10 @@ export interface MeetMePresence {
   uid: string;
   displayName: string;
   photoUrl: string | null;
+  age: number;
+  gender: Gender;
+  lookingFor: LookingFor;
+  orientation: Orientation | null;
   createdAt: Timestamp;
   expiresAt: Timestamp;
 }

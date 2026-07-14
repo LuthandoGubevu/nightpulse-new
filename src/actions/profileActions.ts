@@ -6,14 +6,32 @@ import { FieldValue, Timestamp } from "firebase-admin/firestore";
 import { verifyUserIdToken } from "@/lib/serverAuth";
 import { z } from "zod";
 
-const ProfileInputSchema = z.object({
-  displayName: z.string().trim().min(1).max(40),
-  photoUrl: z.string().url().nullable(),
-});
+const ProfileInputSchema = z
+  .object({
+    displayName: z.string().trim().min(1).max(40),
+    photoUrl: z.string().url().nullable(),
+    // 18+ is enforced here, not just suggested client-side, since this profile now
+    // explicitly supports expressing romantic ("love") intent to other users.
+    age: z.number().int().min(18).max(120),
+    gender: z.enum(["man", "woman", "non-binary"]),
+    lookingFor: z.enum(["friends", "love"]),
+    orientation: z.enum(["straight", "gay", "bisexual"]).nullable(),
+  })
+  .refine((data) => data.lookingFor !== "love" || data.orientation !== null, {
+    message: "Orientation is required when looking for love.",
+    path: ["orientation"],
+  });
 
 export async function saveProfileAction(
   idToken: string,
-  data: { displayName: string; photoUrl: string | null }
+  data: {
+    displayName: string;
+    photoUrl: string | null;
+    age: number;
+    gender: string;
+    lookingFor: string;
+    orientation: string | null;
+  }
 ): Promise<{ success: boolean; error?: string }> {
   const authCheck = await verifyUserIdToken(idToken);
   if (!authCheck.ok) return { success: false, error: authCheck.error };
@@ -22,7 +40,7 @@ export async function saveProfileAction(
 
   const validation = ProfileInputSchema.safeParse(data);
   if (!validation.success) {
-    return { success: false, error: "Invalid profile submission." };
+    return { success: false, error: validation.error.issues[0]?.message || "Invalid profile submission." };
   }
 
   try {
@@ -33,6 +51,10 @@ export async function saveProfileAction(
       {
         displayName: validation.data.displayName,
         photoUrl: validation.data.photoUrl,
+        age: validation.data.age,
+        gender: validation.data.gender,
+        lookingFor: validation.data.lookingFor,
+        orientation: validation.data.lookingFor === "love" ? validation.data.orientation : null,
         blockedUids: existing.exists ? (existing.data()?.blockedUids ?? []) : [],
         createdAt: existing.exists ? existing.data()?.createdAt ?? now : now,
         updatedAt: now,

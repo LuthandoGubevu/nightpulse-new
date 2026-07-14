@@ -16,22 +16,44 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Icons } from "@/components/icons";
 import { useToast } from "@/hooks/use-toast";
+import type { Gender, LookingFor, Orientation } from "@/types";
 
 interface ProfileSetupDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   initialDisplayName?: string;
   initialPhotoUrl?: string | null;
+  initialAge?: number;
+  initialGender?: Gender;
+  initialLookingFor?: LookingFor;
+  initialOrientation?: Orientation | null;
   onSaved: (profile: { displayName: string; photoUrl: string | null }) => void;
 }
+
+const GENDER_OPTIONS: { value: Gender; label: string }[] = [
+  { value: "man", label: "Man" },
+  { value: "woman", label: "Woman" },
+  { value: "non-binary", label: "Non-binary" },
+];
+
+const ORIENTATION_OPTIONS: { value: Orientation; label: string }[] = [
+  { value: "straight", label: "Straight" },
+  { value: "gay", label: "Gay" },
+  { value: "bisexual", label: "Bisexual" },
+];
 
 export function ProfileSetupDialog({
   open,
   onOpenChange,
   initialDisplayName,
   initialPhotoUrl,
+  initialAge,
+  initialGender,
+  initialLookingFor,
+  initialOrientation,
   onSaved,
 }: ProfileSetupDialogProps) {
   const { toast } = useToast();
@@ -39,6 +61,10 @@ export function ProfileSetupDialog({
   const [displayName, setDisplayName] = useState(initialDisplayName ?? "");
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(initialPhotoUrl ?? null);
+  const [age, setAge] = useState(initialAge ? String(initialAge) : "");
+  const [gender, setGender] = useState<Gender | undefined>(initialGender);
+  const [lookingFor, setLookingFor] = useState<LookingFor | undefined>(initialLookingFor);
+  const [orientation, setOrientation] = useState<Orientation | undefined>(initialOrientation ?? undefined);
   const [isSaving, setIsSaving] = useState(false);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -52,6 +78,27 @@ export function ProfileSetupDialog({
     const trimmedName = displayName.trim();
     if (!trimmedName) {
       toast({ title: "Name required", description: "Enter a name so others can recognize you.", variant: "destructive" });
+      return;
+    }
+
+    const ageNum = parseInt(age, 10);
+    if (!Number.isFinite(ageNum) || ageNum < 18) {
+      toast({ title: "Age required", description: "You must be 18 or older to use Meet Me.", variant: "destructive" });
+      return;
+    }
+
+    if (!gender) {
+      toast({ title: "Gender required", description: "Select a gender to continue.", variant: "destructive" });
+      return;
+    }
+
+    if (!lookingFor) {
+      toast({ title: "Pick one", description: "Select whether you're looking for friends or love.", variant: "destructive" });
+      return;
+    }
+
+    if (lookingFor === "love" && !orientation) {
+      toast({ title: "Orientation required", description: "Select an orientation to look for love.", variant: "destructive" });
       return;
     }
 
@@ -72,7 +119,14 @@ export function ProfileSetupDialog({
         photoUrl = await getDownloadURL(fileRef);
       }
 
-      const result = await saveProfileAction(idToken, { displayName: trimmedName, photoUrl });
+      const result = await saveProfileAction(idToken, {
+        displayName: trimmedName,
+        photoUrl,
+        age: ageNum,
+        gender,
+        lookingFor,
+        orientation: lookingFor === "love" ? orientation ?? null : null,
+      });
       if (!result.success) {
         toast({ title: "Couldn't save profile", description: result.error || "An unexpected error occurred.", variant: "destructive" });
         return;
@@ -89,11 +143,11 @@ export function ProfileSetupDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent className="max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Set up your Meet Me profile</DialogTitle>
           <DialogDescription>
-            Just a name and one photo — this is all anyone else at the venue will see.
+            Your name, photo, and age are shown to others at the venue. Gender and orientation are only used to match you with compatible people in Love mode.
           </DialogDescription>
         </DialogHeader>
 
@@ -136,6 +190,74 @@ export function ProfileSetupDialog({
             placeholder="What should people call you?"
           />
         </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="meetme-age">Age</Label>
+          <Input
+            id="meetme-age"
+            type="number"
+            inputMode="numeric"
+            min={18}
+            max={120}
+            value={age}
+            onChange={(e) => setAge(e.target.value)}
+            placeholder="18+"
+          />
+        </div>
+
+        <div className="space-y-2">
+          <Label>Gender</Label>
+          <Select value={gender} onValueChange={(v) => setGender(v as Gender)}>
+            <SelectTrigger>
+              <SelectValue placeholder="Select gender" />
+            </SelectTrigger>
+            <SelectContent>
+              {GENDER_OPTIONS.map((opt) => (
+                <SelectItem key={opt.value} value={opt.value}>
+                  {opt.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="space-y-2">
+          <Label>Looking for</Label>
+          <div className="grid grid-cols-2 gap-2">
+            <Button
+              type="button"
+              variant={lookingFor === "friends" ? "default" : "outline"}
+              onClick={() => setLookingFor("friends")}
+            >
+              <Icons.usersRound className="mr-1.5 h-4 w-4" /> Friends
+            </Button>
+            <Button
+              type="button"
+              variant={lookingFor === "love" ? "default" : "outline"}
+              onClick={() => setLookingFor("love")}
+            >
+              <Icons.heart className="mr-1.5 h-4 w-4" /> Love
+            </Button>
+          </div>
+        </div>
+
+        {lookingFor === "love" && (
+          <div className="space-y-2">
+            <Label>Orientation</Label>
+            <Select value={orientation} onValueChange={(v) => setOrientation(v as Orientation)}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select orientation" />
+              </SelectTrigger>
+              <SelectContent>
+                {ORIENTATION_OPTIONS.map((opt) => (
+                  <SelectItem key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
 
         <DialogFooter>
           <Button onClick={handleSave} disabled={isSaving} className="w-full sm:w-auto">

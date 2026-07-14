@@ -9,9 +9,19 @@ import { Button } from "@/components/ui/button";
 import { Icons } from "@/components/icons";
 import { useToast } from "@/hooks/use-toast";
 import { ProfileSetupDialog } from "./ProfileSetupDialog";
+import type { Gender, LookingFor, Orientation } from "@/types";
 
 interface MeetMeButtonProps {
   clubId: string;
+}
+
+interface ExistingProfile {
+  displayName?: string;
+  photoUrl?: string | null;
+  age?: number;
+  gender?: Gender;
+  lookingFor?: LookingFor;
+  orientation?: Orientation | null;
 }
 
 export function MeetMeButton({ clubId }: MeetMeButtonProps) {
@@ -20,6 +30,7 @@ export function MeetMeButton({ clubId }: MeetMeButtonProps) {
   const [isOptedIn, setIsOptedIn] = useState(false);
   const [isBusy, setIsBusy] = useState(false);
   const [showProfileDialog, setShowProfileDialog] = useState(false);
+  const [existingProfile, setExistingProfile] = useState<ExistingProfile | null>(null);
 
   // Skip the unmount cleanup below when we're the ones navigating to the People Here
   // page — that's an in-feature route change, not the user leaving the venue.
@@ -68,6 +79,32 @@ export function MeetMeButton({ clubId }: MeetMeButtonProps) {
     router.push(`/dashboard/meet-me/${clubId}`);
   };
 
+  // Fetch any existing (possibly partial) profile before opening the setup dialog, so
+  // a returning user who already set a name/photo isn't forced to retype them just
+  // because a newly-added required field (age/gender/looking-for) is still missing.
+  const openProfileDialog = async () => {
+    const uid = auth?.currentUser?.uid;
+    if (uid && firestore) {
+      try {
+        const snap = await getDoc(doc(firestore, "users", uid));
+        if (snap.exists()) {
+          const data = snap.data();
+          setExistingProfile({
+            displayName: data.displayName,
+            photoUrl: data.photoUrl ?? null,
+            age: data.age,
+            gender: data.gender,
+            lookingFor: data.lookingFor,
+            orientation: data.orientation ?? null,
+          });
+        }
+      } catch {
+        // Dialog just opens blank if this fails.
+      }
+    }
+    setShowProfileDialog(true);
+  };
+
   const handleToggle = async () => {
     if (isBusy) return;
     const idToken = await auth?.currentUser?.getIdToken();
@@ -99,7 +136,7 @@ export function MeetMeButton({ clubId }: MeetMeButtonProps) {
     }
 
     if (result.error === "Profile required") {
-      setShowProfileDialog(true);
+      openProfileDialog();
       return;
     }
 
@@ -147,6 +184,12 @@ export function MeetMeButton({ clubId }: MeetMeButtonProps) {
       <ProfileSetupDialog
         open={showProfileDialog}
         onOpenChange={setShowProfileDialog}
+        initialDisplayName={existingProfile?.displayName}
+        initialPhotoUrl={existingProfile?.photoUrl}
+        initialAge={existingProfile?.age}
+        initialGender={existingProfile?.gender}
+        initialLookingFor={existingProfile?.lookingFor}
+        initialOrientation={existingProfile?.orientation}
         onSaved={handleProfileSaved}
       />
     </>
