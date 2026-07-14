@@ -4,6 +4,7 @@
 import { adminFirestore } from "@/lib/firebaseAdmin";
 import { Timestamp } from "firebase-admin/firestore";
 import { verifyUserIdToken } from "@/lib/serverAuth";
+import { canConnect } from "@/lib/meetMeCompatibility";
 import { z } from "zod";
 
 const PRESENCE_LIFETIME_MS = 4 * 60 * 60 * 1000; // 4 hours — a typical night out
@@ -25,7 +26,14 @@ export async function optInMeetMeAction(
   try {
     const profileSnap = await adminFirestore.collection("users").doc(authCheck.uid).get();
     const profile = profileSnap.data();
-    if (!profileSnap.exists || !profile?.displayName) {
+    const hasCompleteProfile =
+      profileSnap.exists &&
+      !!profile?.displayName &&
+      typeof profile?.age === "number" &&
+      !!profile?.gender &&
+      !!profile?.lookingFor &&
+      (profile.lookingFor !== "love" || !!profile?.orientation);
+    if (!hasCompleteProfile) {
       return { success: false, error: "Profile required" };
     }
 
@@ -37,8 +45,12 @@ export async function optInMeetMeAction(
       .doc(authCheck.uid)
       .set({
         uid: authCheck.uid,
-        displayName: profile.displayName,
-        photoUrl: profile.photoUrl ?? null,
+        displayName: profile!.displayName,
+        photoUrl: profile!.photoUrl ?? null,
+        age: profile!.age,
+        gender: profile!.gender,
+        lookingFor: profile!.lookingFor,
+        orientation: profile!.lookingFor === "love" ? profile!.orientation ?? null : null,
         createdAt: now,
         expiresAt: Timestamp.fromMillis(now.toMillis() + PRESENCE_LIFETIME_MS),
       });
@@ -110,9 +122,22 @@ export async function expressInterestAction(
       adminFirestore.collection("users").doc(fromUid).get(),
       adminFirestore.collection("users").doc(validation.data.toUid).get(),
     ]);
-    const fromBlocked: string[] = fromUserSnap.data()?.blockedUids ?? [];
-    const toBlocked: string[] = toUserSnap.data()?.blockedUids ?? [];
-    if (fromBlocked.includes(validation.data.toUid) || toBlocked.includes(fromUid)) {
+    const fromProfile = fromUserSnap.data();
+    const toProfile = toUserSnap.data();
+    const fromBlocked: string[] = fromProfile?.blockedUids ?? [];
+    const toBlocked: string[] = toProfile?.blockedUids ?? [];
+    // Same generic error for a block or an incompatible gender/orientation pairing —
+    // deliberately not distinguished, so a rejection here never reveals to the caller
+    // which reason applied.
+    const isBlocked = fromBlocked.includes(validation.data.toUid) || toBlocked.includes(fromUid);
+    const isCompatible =
+      !!fromProfile &&
+      !!toProfile &&
+      canConnect(
+        { gender: fromProfile.gender, lookingFor: fromProfile.lookingFor, orientation: fromProfile.orientation ?? null },
+        { gender: toProfile.gender, lookingFor: toProfile.lookingFor, orientation: toProfile.orientation ?? null }
+      );
+    if (isBlocked || !isCompatible) {
       return { success: false, matched: false, error: "Unable to express interest in this user." };
     }
 

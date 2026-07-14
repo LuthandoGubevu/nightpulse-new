@@ -1,11 +1,11 @@
 {
-  "name": "NightPulse",
-  "short_name": "NightPulse",
+  "name": "Vybi",
+  "short_name": "Vybi",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#000000",
   "theme_color": "#0F172A",
-  "description": "Navigate the night with real-time club crowd data and estimated wait times.",
+  "description": "Real-time nightclub crowd insights, plus an opt-in way to meet friends (or something more) at the venues you're already at.",
   "icons": [
     {
       "src": "/icons/72x72.png",

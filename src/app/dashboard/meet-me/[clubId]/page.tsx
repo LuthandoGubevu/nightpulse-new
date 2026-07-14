@@ -1,17 +1,14 @@
+
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { collection, getDoc, doc, onSnapshot, Timestamp } from "firebase/firestore";
+import { useParams, useRouter } from "next/navigation";
+import { collection, doc, getDoc, onSnapshot, Timestamp } from "firebase/firestore";
 import { auth, firestore } from "@/lib/firebase";
 import { expressInterestAction } from "@/actions/meetMeActions";
 import { blockUserAction } from "@/actions/profileActions";
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet";
+import { canConnect, type CompatibilityProfile } from "@/lib/meetMeCompatibility";
+import { PageHeader } from "@/components/common/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
@@ -21,21 +18,27 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Icons } from "@/components/icons";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
-import { ReportUserDialog } from "./ReportUserDialog";
+import { ReportUserDialog } from "@/components/meetme/ReportUserDialog";
 import type { MeetMePresenceWithId } from "@/types";
 
-interface MeetMePresenceListProps {
-  clubId: string;
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  onMatched: (conversationId: string) => void;
+function timeAgo(timestamp?: Timestamp) {
+  if (!timestamp?.toDate) return null;
+  const minutes = Math.max(1, Math.round((Date.now() - timestamp.toDate().getTime()) / 60000));
+  if (minutes < 60) return `${minutes}m ago`;
+  return `${Math.round(minutes / 60)}h ago`;
 }
 
-export function MeetMePresenceList({ clubId, open, onOpenChange, onMatched }: MeetMePresenceListProps) {
+export default function MeetMePeoplePage() {
+  const { clubId } = useParams<{ clubId: string }>();
+  const router = useRouter();
   const { toast } = useToast();
+
+  const [loading, setLoading] = useState(true);
   const [people, setPeople] = useState<MeetMePresenceWithId[]>([]);
   const [blockedUids, setBlockedUids] = useState<string[]>([]);
+  const [myProfile, setMyProfile] = useState<CompatibilityProfile | null>(null);
   const [pendingUids, setPendingUids] = useState<Set<string>>(new Set());
   const [interestedUids, setInterestedUids] = useState<Set<string>>(new Set());
   const [reportTarget, setReportTarget] = useState<{ uid: string; name: string } | null>(null);
@@ -43,11 +46,15 @@ export function MeetMePresenceList({ clubId, open, onOpenChange, onMatched }: Me
   const currentUid = auth?.currentUser?.uid;
 
   useEffect(() => {
-    if (!open || !firestore || !currentUid) return;
+    if (!firestore || !currentUid) return;
 
     (async () => {
       const snap = await getDoc(doc(firestore!, "users", currentUid));
-      setBlockedUids(snap.exists() ? (snap.data().blockedUids ?? []) : []);
+      const data = snap.data();
+      setBlockedUids(data?.blockedUids ?? []);
+      if (data) {
+        setMyProfile({ gender: data.gender, lookingFor: data.lookingFor, orientation: data.orientation ?? null });
+      }
     })();
 
     const unsubscribe = onSnapshot(
@@ -58,19 +65,21 @@ export function MeetMePresenceList({ clubId, open, onOpenChange, onMatched }: Me
           .map((d) => ({ id: d.id, ...(d.data() as any) }) as MeetMePresenceWithId)
           .filter((p) => p.id !== currentUid && p.expiresAt?.toMillis?.() > now.toMillis());
         setPeople(list);
+        setLoading(false);
       },
       (error) => {
         console.error("Error listening to Meet Me presence:", error);
         toast({ title: "Error", description: "Could not load who's here.", variant: "destructive" });
+        setLoading(false);
       }
     );
     return () => unsubscribe();
-  }, [open, clubId, currentUid, toast]);
+  }, [clubId, currentUid, toast]);
 
-  const visiblePeople = useMemo(
-    () => people.filter((p) => !blockedUids.includes(p.id)),
-    [people, blockedUids]
-  );
+  const visiblePeople = useMemo(() => {
+    if (!myProfile) return [];
+    return people.filter((p) => !blockedUids.includes(p.id) && canConnect(myProfile, p));
+  }, [people, blockedUids, myProfile]);
 
   const handleInterested = async (targetUid: string) => {
     const idToken = await auth?.currentUser?.getIdToken();
@@ -95,8 +104,7 @@ export function MeetMePresenceList({ clubId, open, onOpenChange, onMatched }: Me
 
     if (result.matched && result.conversationId) {
       toast({ title: "It's a match!", description: "You can now chat." });
-      onOpenChange(false);
-      onMatched(result.conversationId);
+      router.push(`/chat/${result.conversationId}`);
     } else {
       toast({ title: "Interest sent", description: "If they're interested too, you'll be able to chat." });
     }
@@ -115,49 +123,68 @@ export function MeetMePresenceList({ clubId, open, onOpenChange, onMatched }: Me
   };
 
   return (
-    <>
-      <Sheet open={open} onOpenChange={onOpenChange}>
-        <SheetContent className="flex flex-col">
-          <SheetHeader>
-            <SheetTitle>People here</SheetTitle>
-            <SheetDescription>
-              Everyone below has also tapped Meet Me at this venue. Express interest — if it&apos;s mutual, a chat opens up.
-            </SheetDescription>
-          </SheetHeader>
+    <div className="container mx-auto py-8 px-4 max-w-2xl">
+      <PageHeader title="People here" description="Everyone below has also tapped Meet Me at this venue.">
+        <Button variant="ghost" size="sm" onClick={() => router.back()}>
+          <Icons.close className="mr-2 h-4 w-4" /> Close
+        </Button>
+      </PageHeader>
 
-          <div className="mt-4 flex-1 overflow-y-auto space-y-3">
-            {visiblePeople.length === 0 && (
-              <p className="text-sm text-muted-foreground text-center py-8">
-                No one else here yet. Check back soon.
-              </p>
-            )}
-            {visiblePeople.map((person) => (
-              <div key={person.id} className="flex items-center gap-3 rounded-lg border p-3">
-                <Avatar className="h-12 w-12">
+      <div className="mt-6 space-y-3">
+        {loading && (
+          <>
+            <Skeleton className="h-24 w-full rounded-xl" />
+            <Skeleton className="h-24 w-full rounded-xl" />
+          </>
+        )}
+
+        {!loading && visiblePeople.length === 0 && (
+          <p className="text-sm text-muted-foreground text-center py-12">
+            No one else here yet. Check back soon.
+          </p>
+        )}
+
+        {visiblePeople.map((person) => {
+          const isInterested = interestedUids.has(person.id);
+          const isPending = pendingUids.has(person.id);
+          const joined = timeAgo(person.createdAt);
+
+          return (
+            <div
+              key={person.id}
+              className="rounded-xl border bg-card p-4 flex flex-col gap-3 sm:flex-row sm:items-center"
+            >
+              <div className="flex items-center gap-3 flex-1 min-w-0">
+                <Avatar className="h-14 w-14 border shrink-0">
                   {person.photoUrl ? <AvatarImage src={person.photoUrl} alt={person.displayName} /> : null}
                   <AvatarFallback>
-                    <Icons.userRound className="h-6 w-6 text-muted-foreground" />
+                    <Icons.userRound className="h-7 w-7 text-muted-foreground" />
                   </AvatarFallback>
                 </Avatar>
-                <span className="flex-1 font-medium truncate">{person.displayName}</span>
-                <Button
-                  size="sm"
-                  variant={interestedUids.has(person.id) ? "secondary" : "default"}
-                  disabled={pendingUids.has(person.id) || interestedUids.has(person.id)}
-                  onClick={() => handleInterested(person.id)}
-                >
-                  {pendingUids.has(person.id) ? (
-                    <Icons.spinner className="h-4 w-4 animate-spin" />
-                  ) : interestedUids.has(person.id) ? (
-                    <>
-                      <Icons.check className="mr-1 h-4 w-4" /> Interested
-                    </>
-                  ) : (
-                    <>
-                      <Icons.heart className="mr-1 h-4 w-4" /> Interested
-                    </>
-                  )}
-                </Button>
+                <div className="min-w-0">
+                  <p className="font-semibold truncate">
+                    {person.displayName}
+                    {typeof person.age === "number" ? `, ${person.age}` : ""}
+                  </p>
+                  {joined && <p className="text-xs text-muted-foreground">Here since {joined}</p>}
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 justify-end shrink-0">
+                {isInterested ? (
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/15 text-emerald-500 px-3 py-1.5 text-sm font-medium whitespace-nowrap">
+                    <Icons.check className="h-4 w-4" /> Interested
+                  </span>
+                ) : (
+                  <Button size="sm" disabled={isPending} onClick={() => handleInterested(person.id)}>
+                    {isPending ? (
+                      <Icons.spinner className="mr-1.5 h-4 w-4 animate-spin" />
+                    ) : (
+                      <Icons.heart className="mr-1.5 h-4 w-4" />
+                    )}
+                    Interested
+                  </Button>
+                )}
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button size="icon" variant="ghost" aria-label={`More options for ${person.displayName}`}>
@@ -174,10 +201,10 @@ export function MeetMePresenceList({ clubId, open, onOpenChange, onMatched }: Me
                   </DropdownMenuContent>
                 </DropdownMenu>
               </div>
-            ))}
-          </div>
-        </SheetContent>
-      </Sheet>
+            </div>
+          );
+        })}
+      </div>
 
       {reportTarget && (
         <ReportUserDialog
@@ -188,6 +215,6 @@ export function MeetMePresenceList({ clubId, open, onOpenChange, onMatched }: Me
           clubId={clubId}
         />
       )}
-    </>
+    </div>
   );
 }

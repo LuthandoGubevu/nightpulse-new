@@ -1,4 +1,4 @@
-const CACHE_NAME = 'nightpulse-v3';
+const CACHE_NAME = 'vybi-v1';
 const urlsToCache = [
   '/',
   '/dashboard',
