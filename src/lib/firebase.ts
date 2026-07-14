@@ -2,11 +2,13 @@
 import { initializeApp, getApps, type FirebaseApp } from "firebase/app";
 import { getFirestore, type Firestore } from "firebase/firestore";
 import { getAuth, type Auth } from "firebase/auth";
+import { getStorage, type FirebaseStorage } from "firebase/storage";
 // import { getAnalytics } from "firebase/analytics";
 
 let app: FirebaseApp | undefined;
 let firestore: Firestore | undefined;
 let auth: Auth | undefined;
+let storage: FirebaseStorage | undefined;
 // let analytics;
 
 const getFirebaseConfig = () => ({
@@ -56,6 +58,7 @@ if (typeof window === "undefined") {
   app = undefined;
   firestore = undefined;
   auth = undefined;
+  storage = undefined;
 } else if (configProblems.length > 0) {
   console.warn(
     "🔴 Firebase is not properly configured. The following issues were found with your environment variables (check your .env file and ensure the server was restarted after changes):"
@@ -68,6 +71,7 @@ if (typeof window === "undefined") {
   app = undefined;
   firestore = undefined;
   auth = undefined;
+  storage = undefined;
 } else {
   if (!getApps().length) {
     try {
@@ -75,7 +79,8 @@ if (typeof window === "undefined") {
       app = initializeApp(firebaseConfig as any);
       firestore = getFirestore(app);
       auth = getAuth(app);
-      console.info("✅ Firebase app, firestore, and auth services initialized.");
+      storage = getStorage(app);
+      console.info("✅ Firebase app, firestore, auth, and storage services initialized.");
       // if (firebaseConfig.measurementId && !String(firebaseConfig.measurementId).startsWith("YOUR_")) {
       //   analytics = getAnalytics(app);
       // }
@@ -84,12 +89,14 @@ if (typeof window === "undefined") {
       app = undefined;
       firestore = undefined;
       auth = undefined;
+      storage = undefined;
     }
   } else {
     app = getApps()[0]!;
     firestore = getFirestore(app);
     auth = getAuth(app);
-    console.info("✅ Firebase app, firestore, and auth services re-used existing initialization.");
+    storage = getStorage(app);
+    console.info("✅ Firebase app, firestore, auth, and storage services re-used existing initialization.");
     // if (firebaseConfig.measurementId && !String(firebaseConfig.measurementId).startsWith("YOUR_") && app) {
     //   analytics = getAnalytics(app);
     // }
@@ -108,7 +115,7 @@ if (typeof window !== "undefined") {
 }
 
 
-export { app, auth, firestore };
+export { app, auth, firestore, storage };
 
 // Helper to convert Firestore Timestamps to Dates safely
 export const transformTimestamp = (timestamp: any) => {

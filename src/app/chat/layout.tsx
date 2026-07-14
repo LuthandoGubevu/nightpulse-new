@@ -2,19 +2,19 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
 import { PageHeader } from "@/components/common/PageHeader";
 import { Icons } from "@/components/icons";
-import { MatchNotificationListener } from "@/components/meetme/MatchNotificationListener";
 
-export default function DashboardLayout({
+export default function ChatLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
   const { user, loading: authLoading } = useAuth();
   const router = useRouter();
+  const pathname = usePathname();
   const [isClient, setIsClient] = useState(false);
 
   useEffect(() => {
@@ -26,9 +26,9 @@ export default function DashboardLayout({
       return;
     }
     if (!user) {
-      router.replace(`/auth?redirect=${encodeURIComponent("/dashboard")}`);
+      router.replace(`/auth?redirect=${encodeURIComponent(pathname)}`);
     }
-  }, [user, authLoading, router, isClient]);
+  }, [user, authLoading, router, isClient, pathname]);
 
   if (authLoading || !isClient || !user) {
     return (
@@ -43,10 +43,5 @@ export default function DashboardLayout({
     );
   }
 
-  return (
-    <>
-      <MatchNotificationListener />
-      {children}
-    </>
-  );
+  return <>{children}</>;
 }

@@ -16,7 +16,12 @@ export const siteConfig = {
     {
       title: "Dashboard",
       href: "/dashboard",
-      icon: "layoutDashboard" as keyof typeof Icons, 
+      icon: "layoutDashboard" as keyof typeof Icons,
+    },
+    {
+      title: "Matches",
+      href: "/dashboard/matches",
+      icon: "heart" as keyof typeof Icons,
     },
     {
       title: "Manage Clubs",
