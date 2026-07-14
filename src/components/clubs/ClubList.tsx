@@ -3,9 +3,10 @@ import { ClubCard } from "./ClubCard";
 
 interface ClubListProps {
   clubs: ClubWithId[];
+  activeGeofenceClubId?: string | null;
 }
 
-export function ClubList({ clubs }: ClubListProps) {
+export function ClubList({ clubs, activeGeofenceClubId }: ClubListProps) {
   if (!clubs || clubs.length === 0) {
     return (
       <div className="text-center py-10">
@@ -18,7 +19,7 @@ export function ClubList({ clubs }: ClubListProps) {
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
       {clubs.map((club) => (
-        <ClubCard key={club.id} club={club} />
+        <ClubCard key={club.id} club={club} isHereNow={club.id === activeGeofenceClubId} />
       ))}
     </div>
   );

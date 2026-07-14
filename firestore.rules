@@ -42,6 +42,86 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    // "Meet Me" feature — user profiles:
+    // - Writes go exclusively through profileActions.ts (Admin SDK), which validates
+    //   displayName/photoUrl before writing.
+    // - Reads are open to any signed-in user: the discovery list needs to render other
+    //   people's name/photo, and blockedUids on a stranger's own doc isn't sensitive.
+    match /users/{uid} {
+      allow read: if request.auth != null;
+      allow write: if false;
+    }
+
+    // "Meet Me" presence — who is opted-in and physically at a club right now:
+    // - Writes go exclusively through meetMeActions.ts (Admin SDK), which requires a
+    //   profile to already exist before opting a user in.
+    // - Reads use a self-membership gate: "you can only see the list if you're also on
+    //   it" — the classic Firestore self-referential existence check. This intentionally
+    //   cannot enforce blocking (rules can't cheaply intersect a collection query against
+    //   another doc's array field); blocked users are filtered out client-side, and the
+    //   real enforcement boundary against a blocked person is expressInterestAction.
+    match /clubs/{clubId}/meetMePresence/{uid} {
+      allow read: if request.auth != null
+                  && exists(/databases/$(database)/documents/clubs/$(clubId)/meetMePresence/$(request.auth.uid));
+      allow write: if false;
+    }
+
+    // "Meet Me" one-directional interest ("fromUid is interested in toUid"), doc ID
+    // composed as {clubId}_{fromUid}_{toUid}. All reads/writes go exclusively through
+    // expressInterestAction (Admin SDK transaction), which detects mutual interest and
+    // creates the conversation doc atomically — a client with direct write access could
+    // otherwise fake a match by writing both directions itself.
+    match /interests/{interestId} {
+      allow read, write: if false;
+    }
+
+    // "Meet Me" chat — a conversation only exists once two people have matched.
+    match /conversations/{conversationId} {
+      // Conversation docs are only ever created by expressInterestAction's transaction —
+      // never directly by a client. Participants MAY update the denormalized
+      // lastMessageAt/lastMessageText preview (used to sort a "your matches" list)
+      // after sending a message directly to the messages subcollection below — every
+      // other field is immutable from the client.
+      allow read: if request.auth != null && request.auth.uid in resource.data.participantUids;
+      allow create, delete: if false;
+      allow update: if request.auth != null
+                    && request.auth.uid in resource.data.participantUids
+                    && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['lastMessageAt', 'lastMessageText'])
+                    && request.resource.data.participantUids == resource.data.participantUids
+                    && request.resource.data.clubId == resource.data.clubId
+                    && request.resource.data.createdAt == resource.data.createdAt;
+
+      match /messages/{messageId} {
+        // Unlike every other mutation in this codebase, message sends are a direct
+        // client write: a participant-membership check is the standard, safe Firestore
+        // chat pattern, and routing every message through a Server Action would add a
+        // network hop with no extra security value.
+        allow read: if request.auth != null
+                    && request.auth.uid in get(/databases/$(database)/documents/conversations/$(conversationId)).data.participantUids;
+        allow create: if request.auth != null
+                      && request.auth.uid in get(/databases/$(database)/documents/conversations/$(conversationId)).data.participantUids
+                      && request.resource.data.senderUid == request.auth.uid
+                      && request.resource.data.text is string
+                      && request.resource.data.text.size() > 0
+                      && request.resource.data.text.size() < 2000;
+        allow update, delete: if false;
+      }
+    }
+
+    // "Meet Me" reports — a reporter may only ever create a report claiming to be
+    // themselves; only the super-admin accounts may read reports (a future admin review
+    // UI). No client update/delete — status transitions are a future Admin SDK action.
+    match /reports/{reportId} {
+      allow create: if request.auth != null
+                    && request.resource.data.reporterUid == request.auth.uid
+                    && request.resource.data.status == "open"
+                    && request.resource.data.keys().hasOnly(['reporterUid', 'reportedUid', 'clubId', 'conversationId', 'reason', 'createdAt', 'status']);
+      allow read: if request.auth != null
+                  && request.auth.token.email in ['lgubevu@gmail.com', 'kwezi.nyakaza@gmail.com']
+                  && request.auth.token.email_verified == true;
+      allow update, delete: if false;
+    }
+
     // By default, if no rule above matches a path, access is denied.
     // This means any other collections or paths not explicitly allowed are protected.
   }

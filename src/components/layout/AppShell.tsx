@@ -58,7 +58,7 @@ export default function AppShell({ children }: AppShellProps) {
     if (item.href === "/admin/clubs" || item.href === "/admin/analytics") {
       return !authLoading && !!user && isAdminEmail(user.email);
     }
-    if (item.href === "/dashboard") {
+    if (item.href === "/dashboard" || item.href?.startsWith("/dashboard/")) {
       return !authLoading && !!user;
     }
     return true; // Home (and anything else ungated) always shows
