@@ -1,14 +1,14 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { auth } from "@/lib/firebase";
+import { doc, getDoc } from "firebase/firestore";
+import { auth, firestore } from "@/lib/firebase";
 import { optInMeetMeAction, optOutMeetMeAction } from "@/actions/meetMeActions";
 import { Button } from "@/components/ui/button";
 import { Icons } from "@/components/icons";
 import { useToast } from "@/hooks/use-toast";
 import { ProfileSetupDialog } from "./ProfileSetupDialog";
-import { MeetMePresenceList } from "./MeetMePresenceList";
 
 interface MeetMeButtonProps {
   clubId: string;
@@ -20,14 +20,41 @@ export function MeetMeButton({ clubId }: MeetMeButtonProps) {
   const [isOptedIn, setIsOptedIn] = useState(false);
   const [isBusy, setIsBusy] = useState(false);
   const [showProfileDialog, setShowProfileDialog] = useState(false);
-  const [showPresenceSheet, setShowPresenceSheet] = useState(false);
 
-  // Instant invisibility: if this card unmounts (the user left the geofence, or
-  // navigated away) while opted in, clear presence immediately rather than leaving
-  // it to the multi-hour TTL policy to eventually clean up.
+  // Skip the unmount cleanup below when we're the ones navigating to the People Here
+  // page — that's an in-feature route change, not the user leaving the venue.
+  const skipCleanupRef = useRef(false);
+
+  // On mount, check whether a presence doc already exists for this club (e.g. the user
+  // opted in, then navigated to the People Here page and back — the button itself
+  // remounts fresh each time, so without this it would wrongly show "Meet Me" again
+  // while the user is actually still visible).
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const uid = auth?.currentUser?.uid;
+      if (!uid || !firestore) return;
+      try {
+        const snap = await getDoc(doc(firestore, "clubs", clubId, "meetMePresence", uid));
+        if (!cancelled && snap.exists()) {
+          setIsOptedIn(true);
+        }
+      } catch {
+        // The read rule's self-existence check fails when our own presence doc doesn't
+        // exist, which surfaces as permission-denied — that just means "not opted in".
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [clubId]);
+
+  // Instant invisibility: if this card unmounts because the user left the geofence
+  // (not because they navigated to the People Here page — see skipCleanupRef above),
+  // clear presence immediately rather than leaving it to the multi-hour TTL policy.
   useEffect(() => {
     return () => {
-      if (isOptedIn) {
+      if (isOptedIn && !skipCleanupRef.current) {
         auth?.currentUser?.getIdToken().then((idToken) => {
           if (idToken) optOutMeetMeAction(idToken, clubId);
         });
@@ -35,6 +62,11 @@ export function MeetMeButton({ clubId }: MeetMeButtonProps) {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [clubId]);
+
+  const goToPeoplePage = () => {
+    skipCleanupRef.current = true;
+    router.push(`/dashboard/meet-me/${clubId}`);
+  };
 
   const handleToggle = async () => {
     if (isBusy) return;
@@ -50,7 +82,6 @@ export function MeetMeButton({ clubId }: MeetMeButtonProps) {
       setIsBusy(false);
       if (result.success) {
         setIsOptedIn(false);
-        setShowPresenceSheet(false);
       } else {
         toast({ title: "Couldn't opt out", description: result.error || "An unexpected error occurred.", variant: "destructive" });
       }
@@ -63,7 +94,7 @@ export function MeetMeButton({ clubId }: MeetMeButtonProps) {
 
     if (result.success) {
       setIsOptedIn(true);
-      setShowPresenceSheet(true);
+      goToPeoplePage();
       return;
     }
 
@@ -83,7 +114,7 @@ export function MeetMeButton({ clubId }: MeetMeButtonProps) {
     setIsBusy(false);
     if (result.success) {
       setIsOptedIn(true);
-      setShowPresenceSheet(true);
+      goToPeoplePage();
     } else {
       toast({ title: "Couldn't opt in", description: result.error || "An unexpected error occurred.", variant: "destructive" });
     }
@@ -107,7 +138,7 @@ export function MeetMeButton({ clubId }: MeetMeButtonProps) {
           {isOptedIn ? "You're visible — tap to leave" : "Meet Me"}
         </Button>
         {isOptedIn && (
-          <Button size="sm" variant="outline" onClick={() => setShowPresenceSheet(true)}>
+          <Button size="sm" variant="outline" onClick={goToPeoplePage}>
             People here
           </Button>
         )}
@@ -118,15 +149,6 @@ export function MeetMeButton({ clubId }: MeetMeButtonProps) {
         onOpenChange={setShowProfileDialog}
         onSaved={handleProfileSaved}
       />
-
-      {isOptedIn && (
-        <MeetMePresenceList
-          clubId={clubId}
-          open={showPresenceSheet}
-          onOpenChange={setShowPresenceSheet}
-          onMatched={(conversationId) => router.push(`/chat/${conversationId}`)}
-        />
-      )}
     </>
   );
 }

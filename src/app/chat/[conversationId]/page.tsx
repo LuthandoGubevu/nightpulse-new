@@ -34,6 +34,14 @@ import type { ChatMessageWithId, ConversationWithId } from "@/types";
 
 type LoadState = "loading" | "ready" | "denied";
 
+function formatMessageTime(timestamp: unknown) {
+  if (timestamp && typeof (timestamp as any).toDate === "function") {
+    return (timestamp as any).toDate().toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  }
+  // A locally-added message shows this until the serverTimestamp() sentinel resolves.
+  return "Sending…";
+}
+
 export default function ChatThreadPage() {
   const { conversationId } = useParams<{ conversationId: string }>();
   const router = useRouter();
@@ -193,7 +201,7 @@ export default function ChatThreadPage() {
         {messages.map((message) => {
           const isOwn = message.senderUid === user?.uid;
           return (
-            <div key={message.id} className={cn("flex", isOwn ? "justify-end" : "justify-start")}>
+            <div key={message.id} className={cn("flex flex-col", isOwn ? "items-end" : "items-start")}>
               <div
                 className={cn(
                   "max-w-[75%] rounded-lg px-3 py-2 text-sm",
@@ -202,6 +210,9 @@ export default function ChatThreadPage() {
               >
                 {message.text}
               </div>
+              <span className="text-[10px] text-muted-foreground mt-0.5 px-1">
+                {formatMessageTime(message.createdAt)}
+              </span>
             </div>
           );
         })}
