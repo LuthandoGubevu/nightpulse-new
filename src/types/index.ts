@@ -69,16 +69,16 @@ export interface UserLocation {
 // "Meet Me" feature — user profile, presence, matching, and chat.
 
 export type Gender = "man" | "woman" | "non-binary";
+// What someone's checked in for at THIS venue right now — reconfirmed at every
+// check-in (see optInMeetMeAction), not a permanent identity attribute like gender.
 export type LookingFor = "friends" | "love";
-export type Orientation = "straight" | "gay" | "bisexual";
 
 export interface UserProfile {
   displayName: string;
   photoUrl: string | null;
   age: number;
   gender: Gender;
-  lookingFor: LookingFor;
-  orientation: Orientation | null; // set only when lookingFor === "love"
+  lookingFor: LookingFor; // last choice made at any check-in; only a pre-fill default
   blockedUids: string[];
   createdAt: Timestamp;
   updatedAt: Timestamp;
@@ -93,7 +93,6 @@ export interface MeetMePresence {
   age: number;
   gender: Gender;
   lookingFor: LookingFor;
-  orientation: Orientation | null;
   createdAt: Timestamp;
   expiresAt: Timestamp;
 }

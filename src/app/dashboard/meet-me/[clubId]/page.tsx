@@ -7,7 +7,6 @@ import { collection, doc, getDoc, onSnapshot, Timestamp } from "firebase/firesto
 import { auth, firestore } from "@/lib/firebase";
 import { expressInterestAction } from "@/actions/meetMeActions";
 import { blockUserAction } from "@/actions/profileActions";
-import { canConnect, type CompatibilityProfile } from "@/lib/meetMeCompatibility";
 import { PageHeader } from "@/components/common/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -38,7 +37,6 @@ export default function MeetMePeoplePage() {
   const [loading, setLoading] = useState(true);
   const [people, setPeople] = useState<MeetMePresenceWithId[]>([]);
   const [blockedUids, setBlockedUids] = useState<string[]>([]);
-  const [myProfile, setMyProfile] = useState<CompatibilityProfile | null>(null);
   const [pendingUids, setPendingUids] = useState<Set<string>>(new Set());
   const [interestedUids, setInterestedUids] = useState<Set<string>>(new Set());
   const [reportTarget, setReportTarget] = useState<{ uid: string; name: string } | null>(null);
@@ -50,11 +48,7 @@ export default function MeetMePeoplePage() {
 
     (async () => {
       const snap = await getDoc(doc(firestore!, "users", currentUid));
-      const data = snap.data();
-      setBlockedUids(data?.blockedUids ?? []);
-      if (data) {
-        setMyProfile({ gender: data.gender, lookingFor: data.lookingFor, orientation: data.orientation ?? null });
-      }
+      setBlockedUids(snap.data()?.blockedUids ?? []);
     })();
 
     const unsubscribe = onSnapshot(
@@ -76,10 +70,10 @@ export default function MeetMePeoplePage() {
     return () => unsubscribe();
   }, [clubId, currentUid, toast]);
 
-  const visiblePeople = useMemo(() => {
-    if (!myProfile) return [];
-    return people.filter((p) => !blockedUids.includes(p.id) && canConnect(myProfile, p));
-  }, [people, blockedUids, myProfile]);
+  const visiblePeople = useMemo(
+    () => people.filter((p) => !blockedUids.includes(p.id)),
+    [people, blockedUids]
+  );
 
   const handleInterested = async (targetUid: string) => {
     const idToken = await auth?.currentUser?.getIdToken();
@@ -162,10 +156,27 @@ export default function MeetMePeoplePage() {
                   </AvatarFallback>
                 </Avatar>
                 <div className="min-w-0">
-                  <p className="font-semibold truncate">
-                    {person.displayName}
-                    {typeof person.age === "number" ? `, ${person.age}` : ""}
-                  </p>
+                  <div className="flex items-center gap-2">
+                    <p className="font-semibold truncate">
+                      {person.displayName}
+                      {typeof person.age === "number" ? `, ${person.age}` : ""}
+                    </p>
+                    <span
+                      className={
+                        "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium shrink-0 " +
+                        (person.lookingFor === "love"
+                          ? "bg-pink-500/15 text-pink-500"
+                          : "bg-sky-500/15 text-sky-500")
+                      }
+                    >
+                      {person.lookingFor === "love" ? (
+                        <Icons.heart className="h-3 w-3" />
+                      ) : (
+                        <Icons.usersRound className="h-3 w-3" />
+                      )}
+                      {person.lookingFor === "love" ? "Love" : "Friends"}
+                    </span>
+                  </div>
                   {joined && <p className="text-xs text-muted-foreground">Here since {joined}</p>}
                 </div>
               </div>

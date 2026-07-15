@@ -9,7 +9,8 @@ import { Button } from "@/components/ui/button";
 import { Icons } from "@/components/icons";
 import { useToast } from "@/hooks/use-toast";
 import { ProfileSetupDialog } from "./ProfileSetupDialog";
-import type { Gender, LookingFor, Orientation } from "@/types";
+import { LookingForPrompt } from "./LookingForPrompt";
+import type { Gender, LookingFor } from "@/types";
 
 interface MeetMeButtonProps {
   clubId: string;
@@ -21,7 +22,6 @@ interface ExistingProfile {
   age?: number;
   gender?: Gender;
   lookingFor?: LookingFor;
-  orientation?: Orientation | null;
 }
 
 export function MeetMeButton({ clubId }: MeetMeButtonProps) {
@@ -30,6 +30,7 @@ export function MeetMeButton({ clubId }: MeetMeButtonProps) {
   const [isOptedIn, setIsOptedIn] = useState(false);
   const [isBusy, setIsBusy] = useState(false);
   const [showProfileDialog, setShowProfileDialog] = useState(false);
+  const [showLookingForPrompt, setShowLookingForPrompt] = useState(false);
   const [existingProfile, setExistingProfile] = useState<ExistingProfile | null>(null);
 
   // Skip the unmount cleanup below when we're the ones navigating to the People Here
@@ -79,41 +80,34 @@ export function MeetMeButton({ clubId }: MeetMeButtonProps) {
     router.push(`/dashboard/meet-me/${clubId}`);
   };
 
-  // Fetch any existing (possibly partial) profile before opening the setup dialog, so
-  // a returning user who already set a name/photo isn't forced to retype them just
-  // because a newly-added required field (age/gender/looking-for) is still missing.
-  const openProfileDialog = async () => {
-    const uid = auth?.currentUser?.uid;
-    if (uid && firestore) {
-      try {
-        const snap = await getDoc(doc(firestore, "users", uid));
-        if (snap.exists()) {
-          const data = snap.data();
-          setExistingProfile({
-            displayName: data.displayName,
-            photoUrl: data.photoUrl ?? null,
-            age: data.age,
-            gender: data.gender,
-            lookingFor: data.lookingFor,
-            orientation: data.orientation ?? null,
-          });
-        }
-      } catch {
-        // Dialog just opens blank if this fails.
-      }
+  const completeOptIn = async (lookingFor: LookingFor) => {
+    const idToken = await auth?.currentUser?.getIdToken();
+    if (!idToken) {
+      toast({ title: "Not signed in", description: "Please sign in again.", variant: "destructive" });
+      return;
     }
-    setShowProfileDialog(true);
+    setIsBusy(true);
+    const result = await optInMeetMeAction(idToken, clubId, lookingFor);
+    setIsBusy(false);
+    setShowLookingForPrompt(false);
+
+    if (result.success) {
+      setIsOptedIn(true);
+      goToPeoplePage();
+    } else {
+      toast({ title: "Couldn't opt in", description: result.error || "An unexpected error occurred.", variant: "destructive" });
+    }
   };
 
   const handleToggle = async () => {
     if (isBusy) return;
-    const idToken = await auth?.currentUser?.getIdToken();
-    if (!idToken) {
-      toast({ title: "Not signed in", description: "Please sign in to use Meet Me.", variant: "destructive" });
-      return;
-    }
 
     if (isOptedIn) {
+      const idToken = await auth?.currentUser?.getIdToken();
+      if (!idToken) {
+        toast({ title: "Not signed in", description: "Please sign in to use Meet Me.", variant: "destructive" });
+        return;
+      }
       setIsBusy(true);
       const result = await optOutMeetMeAction(idToken, clubId);
       setIsBusy(false);
@@ -125,35 +119,41 @@ export function MeetMeButton({ clubId }: MeetMeButtonProps) {
       return;
     }
 
-    setIsBusy(true);
-    const result = await optInMeetMeAction(idToken, clubId);
-    setIsBusy(false);
-
-    if (result.success) {
-      setIsOptedIn(true);
-      goToPeoplePage();
+    // Opting in: figure out, from the user's own stable profile fields, whether this is
+    // a first-time setup (full dialog) or a returning user who just needs to reconfirm
+    // what they're looking for tonight (lightweight prompt) — lookingFor itself is
+    // never read silently from a prior session.
+    const uid = auth?.currentUser?.uid;
+    if (!uid || !firestore) {
+      toast({ title: "Not signed in", description: "Please sign in to use Meet Me.", variant: "destructive" });
       return;
     }
 
-    if (result.error === "Profile required") {
-      openProfileDialog();
-      return;
-    }
-
-    toast({ title: "Couldn't opt in", description: result.error || "An unexpected error occurred.", variant: "destructive" });
-  };
-
-  const handleProfileSaved = async () => {
-    const idToken = await auth?.currentUser?.getIdToken();
-    if (!idToken) return;
     setIsBusy(true);
-    const result = await optInMeetMeAction(idToken, clubId);
+    let profileData: any = null;
+    try {
+      const snap = await getDoc(doc(firestore, "users", uid));
+      if (snap.exists()) profileData = snap.data();
+    } catch {
+      // Treated the same as "no profile yet" below.
+    }
     setIsBusy(false);
-    if (result.success) {
-      setIsOptedIn(true);
-      goToPeoplePage();
+
+    const hasCoreProfile =
+      !!profileData?.displayName && typeof profileData?.age === "number" && !!profileData?.gender;
+
+    setExistingProfile({
+      displayName: profileData?.displayName,
+      photoUrl: profileData?.photoUrl ?? null,
+      age: profileData?.age,
+      gender: profileData?.gender,
+      lookingFor: profileData?.lookingFor,
+    });
+
+    if (!hasCoreProfile) {
+      setShowProfileDialog(true);
     } else {
-      toast({ title: "Couldn't opt in", description: result.error || "An unexpected error occurred.", variant: "destructive" });
+      setShowLookingForPrompt(true);
     }
   };
 
@@ -189,8 +189,15 @@ export function MeetMeButton({ clubId }: MeetMeButtonProps) {
         initialAge={existingProfile?.age}
         initialGender={existingProfile?.gender}
         initialLookingFor={existingProfile?.lookingFor}
-        initialOrientation={existingProfile?.orientation}
-        onSaved={handleProfileSaved}
+        onSaved={(profile) => completeOptIn(profile.lookingFor)}
+      />
+
+      <LookingForPrompt
+        open={showLookingForPrompt}
+        onOpenChange={setShowLookingForPrompt}
+        initialLookingFor={existingProfile?.lookingFor}
+        isSubmitting={isBusy}
+        onConfirm={completeOptIn}
       />
     </>
   );
