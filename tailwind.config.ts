@@ -74,6 +74,15 @@ export default {
         md: "calc(var(--radius) - 2px)",
         sm: "calc(var(--radius) - 4px)",
       },
+      backgroundImage: {
+        "gradient-primary": "linear-gradient(135deg, hsl(var(--primary)) 0%, hsl(var(--accent)) 100%)",
+        "gradient-glow": "radial-gradient(ellipse 80% 60% at 50% 0%, hsl(var(--accent) / 0.22), transparent 70%)",
+      },
+      boxShadow: {
+        "glow-sm": "0 0 20px -6px hsl(var(--accent) / 0.45)",
+        glow: "0 0 40px -8px hsl(var(--accent) / 0.55)",
+        "glow-primary": "0 0 30px -6px hsl(var(--primary) / 0.6)",
+      },
       keyframes: {
         "accordion-down": {
           from: { height: "0" },

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'vybi-v1';
+const CACHE_NAME = 'vybi-v2';
 const urlsToCache = [
   '/',
   '/dashboard',
