@@ -18,7 +18,6 @@ import {
 } from "@/components/ui/sidebar";
 import { siteConfig } from "@/config/site";
 import { Icons } from "@/components/icons";
-import { ThemeToggle } from "@/components/theme-toggle";
 import { useAuth } from "@/hooks/useAuth";
 import { auth } from "@/lib/firebase";
 import { useToast } from "@/hooks/use-toast";
@@ -123,9 +122,6 @@ export default function AppShell({ children }: AppShellProps) {
 
           <SidebarFooter className="p-2 mt-auto border-t">
             <div className="flex flex-col gap-2">
-               <div className="group-data-[collapsible=icon]:mx-auto">
-                 <ThemeToggle />
-               </div>
               {authLoading ? (
                 <div className="flex items-center gap-2 px-2">
                   <Icons.spinner className="h-4 w-4 animate-spin text-muted-foreground" />

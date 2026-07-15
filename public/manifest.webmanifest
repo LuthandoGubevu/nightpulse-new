@@ -3,8 +3,8 @@
   "short_name": "Vybi",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#000000",
-  "theme_color": "#0F172A",
+  "background_color": "#0b0a14",
+  "theme_color": "#0b0a14",
   "description": "Real-time nightclub crowd insights, plus an opt-in way to meet friends (or something more) at the venues you're already at.",
   "icons": [
     {

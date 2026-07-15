@@ -40,7 +40,7 @@ export function ClubCard({ club, isHereNow = false }: ClubCardProps) {
   };
 
   return (
-    <Card className="flex flex-col overflow-hidden shadow-lg hover:shadow-xl transition-shadow duration-300">
+    <Card className="flex flex-col overflow-hidden hover:shadow-glow transition-shadow duration-300">
         <CardContent className="p-6 flex-grow space-y-3">
           <div className="flex justify-between items-start">
             <CardTitle className="text-2xl font-headline mb-1">{club.name}</CardTitle>

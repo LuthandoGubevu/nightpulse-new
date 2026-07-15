@@ -4,7 +4,6 @@ import { Inter, Space_Grotesk } from 'next/font/google';
 import './globals.css';
 import { cn } from "@/lib/utils";
 import { Toaster } from "@/components/ui/toaster";
-import { ThemeProvider } from '@/components/theme-provider';
 import { siteConfig } from '@/config/site';
 import AppShell from '@/components/layout/AppShell';
 import { SidebarProvider } from "@/components/ui/sidebar"; // New import
@@ -36,10 +35,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "white" },
-    { media: "(prefers-color-scheme: dark)", color: "#0F172A" },
-  ],
+  themeColor: "#0b0a14",
 }
 
 export default function RootLayout({
@@ -62,17 +58,17 @@ export default function RootLayout({
           fontSpaceGrotesk.variable
         )}
       >
-        <ThemeProvider
-          attribute="class"
-          defaultTheme="dark"
-          enableSystem
-          disableTransitionOnChange
-        >
-          <SidebarProvider defaultOpen={false}> {/* Default to collapsed on desktop, mobile is handled by Sheet */}
-            <AppShell>{children}</AppShell>
-          </SidebarProvider>
-          <Toaster />
-        </ThemeProvider>
+        {/* Ambient background glow: two large, softly blurred spotlights sitting behind
+            every page's content — fixed and pointer-events-none so it never interferes
+            with scrolling or clicks. */}
+        <div aria-hidden className="pointer-events-none fixed inset-0 -z-10 overflow-hidden">
+          <div className="absolute -top-40 -left-40 h-[32rem] w-[32rem] rounded-full bg-primary/25 blur-[120px]" />
+          <div className="absolute top-1/3 -right-40 h-[28rem] w-[28rem] rounded-full bg-accent/20 blur-[120px]" />
+        </div>
+        <SidebarProvider defaultOpen={false}> {/* Default to collapsed on desktop, mobile is handled by Sheet */}
+          <AppShell>{children}</AppShell>
+        </SidebarProvider>
+        <Toaster />
         <Script id="service-worker-registration">
           {`
             if ('serviceWorker' in navigator) {
