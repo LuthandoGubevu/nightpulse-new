@@ -4,43 +4,53 @@
 import { adminFirestore } from "@/lib/firebaseAdmin";
 import { Timestamp } from "firebase-admin/firestore";
 import { verifyUserIdToken } from "@/lib/serverAuth";
-import { canConnect } from "@/lib/meetMeCompatibility";
 import { z } from "zod";
 
 const PRESENCE_LIFETIME_MS = 4 * 60 * 60 * 1000; // 4 hours — a typical night out
 
 const ClubIdSchema = z.string().min(1);
 
+const OptInInputSchema = z.object({
+  clubId: z.string().min(1),
+  // Reconfirmed at every check-in rather than read from the stored profile — someone
+  // looking for love at one venue may just be looking for friends at the next one, and
+  // the app shouldn't silently assume otherwise.
+  lookingFor: z.enum(["friends", "love"]),
+});
+
 export async function optInMeetMeAction(
   idToken: string,
-  clubId: string
+  clubId: string,
+  lookingFor: string
 ): Promise<{ success: boolean; error?: string }> {
   const authCheck = await verifyUserIdToken(idToken);
   if (!authCheck.ok) return { success: false, error: authCheck.error };
 
   if (!adminFirestore) return { success: false, error: "Server Firestore (Admin) not initialized" };
 
-  const validation = ClubIdSchema.safeParse(clubId);
-  if (!validation.success) return { success: false, error: "Invalid club." };
+  const validation = OptInInputSchema.safeParse({ clubId, lookingFor });
+  if (!validation.success) return { success: false, error: "Invalid request." };
 
   try {
-    const profileSnap = await adminFirestore.collection("users").doc(authCheck.uid).get();
+    const userRef = adminFirestore.collection("users").doc(authCheck.uid);
+    const profileSnap = await userRef.get();
     const profile = profileSnap.data();
-    const hasCompleteProfile =
-      profileSnap.exists &&
-      !!profile?.displayName &&
-      typeof profile?.age === "number" &&
-      !!profile?.gender &&
-      !!profile?.lookingFor &&
-      (profile.lookingFor !== "love" || !!profile?.orientation);
-    if (!hasCompleteProfile) {
+    // Only the stable identity fields gate whether setup is required — lookingFor is
+    // supplied fresh on every call, so it's never part of this completeness check.
+    const hasCoreProfile =
+      profileSnap.exists && !!profile?.displayName && typeof profile?.age === "number" && !!profile?.gender;
+    if (!hasCoreProfile) {
       return { success: false, error: "Profile required" };
     }
 
     const now = Timestamp.now();
+    // Persist this check-in's choice as next time's pre-filled default — convenience
+    // only, never silently reused without the user confirming it again.
+    await userRef.set({ lookingFor: validation.data.lookingFor, updatedAt: now }, { merge: true });
+
     await adminFirestore
       .collection("clubs")
-      .doc(validation.data)
+      .doc(validation.data.clubId)
       .collection("meetMePresence")
       .doc(authCheck.uid)
       .set({
@@ -49,8 +59,7 @@ export async function optInMeetMeAction(
         photoUrl: profile!.photoUrl ?? null,
         age: profile!.age,
         gender: profile!.gender,
-        lookingFor: profile!.lookingFor,
-        orientation: profile!.lookingFor === "love" ? profile!.orientation ?? null : null,
+        lookingFor: validation.data.lookingFor,
         createdAt: now,
         expiresAt: Timestamp.fromMillis(now.toMillis() + PRESENCE_LIFETIME_MS),
       });
@@ -126,18 +135,8 @@ export async function expressInterestAction(
     const toProfile = toUserSnap.data();
     const fromBlocked: string[] = fromProfile?.blockedUids ?? [];
     const toBlocked: string[] = toProfile?.blockedUids ?? [];
-    // Same generic error for a block or an incompatible gender/orientation pairing —
-    // deliberately not distinguished, so a rejection here never reveals to the caller
-    // which reason applied.
     const isBlocked = fromBlocked.includes(validation.data.toUid) || toBlocked.includes(fromUid);
-    const isCompatible =
-      !!fromProfile &&
-      !!toProfile &&
-      canConnect(
-        { gender: fromProfile.gender, lookingFor: fromProfile.lookingFor, orientation: fromProfile.orientation ?? null },
-        { gender: toProfile.gender, lookingFor: toProfile.lookingFor, orientation: toProfile.orientation ?? null }
-      );
-    if (isBlocked || !isCompatible) {
+    if (isBlocked) {
       return { success: false, matched: false, error: "Unable to express interest in this user." };
     }
 

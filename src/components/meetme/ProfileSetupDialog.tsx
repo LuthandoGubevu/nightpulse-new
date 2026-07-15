@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ref as storageRef, uploadBytes, getDownloadURL } from "firebase/storage";
 import { auth, storage } from "@/lib/firebase";
 import { saveProfileAction } from "@/actions/profileActions";
@@ -19,7 +19,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Icons } from "@/components/icons";
 import { useToast } from "@/hooks/use-toast";
-import type { Gender, LookingFor, Orientation } from "@/types";
+import type { Gender, LookingFor } from "@/types";
 
 interface ProfileSetupDialogProps {
   open: boolean;
@@ -29,20 +29,13 @@ interface ProfileSetupDialogProps {
   initialAge?: number;
   initialGender?: Gender;
   initialLookingFor?: LookingFor;
-  initialOrientation?: Orientation | null;
-  onSaved: (profile: { displayName: string; photoUrl: string | null }) => void;
+  onSaved: (profile: { displayName: string; photoUrl: string | null; lookingFor: LookingFor }) => void;
 }
 
 const GENDER_OPTIONS: { value: Gender; label: string }[] = [
   { value: "man", label: "Man" },
   { value: "woman", label: "Woman" },
   { value: "non-binary", label: "Non-binary" },
-];
-
-const ORIENTATION_OPTIONS: { value: Orientation; label: string }[] = [
-  { value: "straight", label: "Straight" },
-  { value: "gay", label: "Gay" },
-  { value: "bisexual", label: "Bisexual" },
 ];
 
 export function ProfileSetupDialog({
@@ -53,7 +46,6 @@ export function ProfileSetupDialog({
   initialAge,
   initialGender,
   initialLookingFor,
-  initialOrientation,
   onSaved,
 }: ProfileSetupDialogProps) {
   const { toast } = useToast();
@@ -64,8 +56,23 @@ export function ProfileSetupDialog({
   const [age, setAge] = useState(initialAge ? String(initialAge) : "");
   const [gender, setGender] = useState<Gender | undefined>(initialGender);
   const [lookingFor, setLookingFor] = useState<LookingFor | undefined>(initialLookingFor);
-  const [orientation, setOrientation] = useState<Orientation | undefined>(initialOrientation ?? undefined);
   const [isSaving, setIsSaving] = useState(false);
+
+  // The caller fetches any existing profile asynchronously and only knows the real
+  // initial* values after this dialog has already mounted, so the useState
+  // initializers above only ever see them on a lucky first render. Re-sync from props
+  // every time the dialog actually opens instead.
+  useEffect(() => {
+    if (open) {
+      setDisplayName(initialDisplayName ?? "");
+      setPhotoFile(null);
+      setPhotoPreview(initialPhotoUrl ?? null);
+      setAge(initialAge ? String(initialAge) : "");
+      setGender(initialGender);
+      setLookingFor(initialLookingFor);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -97,11 +104,6 @@ export function ProfileSetupDialog({
       return;
     }
 
-    if (lookingFor === "love" && !orientation) {
-      toast({ title: "Orientation required", description: "Select an orientation to look for love.", variant: "destructive" });
-      return;
-    }
-
     const uid = auth?.currentUser?.uid;
     const idToken = await auth?.currentUser?.getIdToken();
     if (!uid || !idToken) {
@@ -125,14 +127,13 @@ export function ProfileSetupDialog({
         age: ageNum,
         gender,
         lookingFor,
-        orientation: lookingFor === "love" ? orientation ?? null : null,
       });
       if (!result.success) {
         toast({ title: "Couldn't save profile", description: result.error || "An unexpected error occurred.", variant: "destructive" });
         return;
       }
 
-      onSaved({ displayName: trimmedName, photoUrl });
+      onSaved({ displayName: trimmedName, photoUrl, lookingFor });
       onOpenChange(false);
     } catch (error: any) {
       toast({ title: "Couldn't save profile", description: error.message || "An unexpected error occurred.", variant: "destructive" });
@@ -147,7 +148,7 @@ export function ProfileSetupDialog({
         <DialogHeader>
           <DialogTitle>Set up your Meet Me profile</DialogTitle>
           <DialogDescription>
-            Your name, photo, and age are shown to others at the venue. Gender and orientation are only used to match you with compatible people in Love mode.
+            Your name, photo, and age are shown to others who've also opted in at the venue. You'll choose what you're looking for next — and you can change that every time you check in somewhere new.
           </DialogDescription>
         </DialogHeader>
 
@@ -222,7 +223,7 @@ export function ProfileSetupDialog({
         </div>
 
         <div className="space-y-2">
-          <Label>Looking for</Label>
+          <Label>Looking for tonight</Label>
           <div className="grid grid-cols-2 gap-2">
             <Button
               type="button"
@@ -240,24 +241,6 @@ export function ProfileSetupDialog({
             </Button>
           </div>
         </div>
-
-        {lookingFor === "love" && (
-          <div className="space-y-2">
-            <Label>Orientation</Label>
-            <Select value={orientation} onValueChange={(v) => setOrientation(v as Orientation)}>
-              <SelectTrigger>
-                <SelectValue placeholder="Select orientation" />
-              </SelectTrigger>
-              <SelectContent>
-                {ORIENTATION_OPTIONS.map((opt) => (
-                  <SelectItem key={opt.value} value={opt.value}>
-                    {opt.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        )}
 
         <DialogFooter>
           <Button onClick={handleSave} disabled={isSaving} className="w-full sm:w-auto">
