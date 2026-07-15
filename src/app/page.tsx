@@ -75,7 +75,7 @@ export default function LandingPage() {
           </div>
           <p className="text-center text-muted-foreground mt-10 text-lg">
             <Icons.shieldCheck className="inline h-5 w-5 mr-2 text-green-500" />
-            Crowd insights are fully anonymous. Meet Me is entirely opt-in — your profile is only ever visible to others who&apos;ve also opted in at the same venue, and you can go invisible any time.
+            Crowd insights are never shown to other patrons or shared beyond aggregate venue reporting. Meet Me is entirely opt-in — your profile is only ever visible to others who&apos;ve also opted in at the same venue, and you can go invisible any time.
           </p>
         </div>
       </section>

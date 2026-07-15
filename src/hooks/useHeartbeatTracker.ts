@@ -4,6 +4,7 @@
 import { useEffect, useRef, useCallback } from 'react';
 import type { UserLocation } from '@/types';
 import { getOrCreateDeviceId } from '@/lib/deviceId';
+import { auth } from '@/lib/firebase';
 import { useToast } from './use-toast';
 
 interface UseHeartbeatTrackerProps {
@@ -34,6 +35,7 @@ export function useHeartbeatTracker({ clubId, userLocation, isEnabled }: UseHear
 
     // console.log(`Sending heartbeat for club ${clubId} by device ${deviceIdRef.current}`);
     try {
+      const idToken = await auth?.currentUser?.getIdToken().catch(() => undefined);
       const response = await fetch('/api/heartbeat', {
         method: 'POST',
         headers: {
@@ -44,6 +46,7 @@ export function useHeartbeatTracker({ clubId, userLocation, isEnabled }: UseHear
           lat: userLocation.lat,
           lng: userLocation.lng,
           deviceId: deviceIdRef.current,
+          idToken,
         }),
       });
 

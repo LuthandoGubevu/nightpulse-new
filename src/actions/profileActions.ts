@@ -3,8 +3,12 @@
 
 import { adminFirestore } from "@/lib/firebaseAdmin";
 import { FieldValue, Timestamp } from "firebase-admin/firestore";
-import { verifyUserIdToken } from "@/lib/serverAuth";
+import { verifyUserIdToken, verifyAdminIdToken } from "@/lib/serverAuth";
 import { z } from "zod";
+
+// Same 18+ floor as the full Meet Me profile (ProfileInputSchema below) — kept
+// consistent since both write the same users/{uid}.age field.
+const AccountAgeSchema = z.number().int().min(18).max(120);
 
 const ProfileInputSchema = z.object({
   displayName: z.string().trim().min(1).max(40),
@@ -59,6 +63,94 @@ export async function saveProfileAction(
   } catch (error: any) {
     console.error("Error saving profile:", error);
     return { success: false, error: error.message || "Failed to save profile." };
+  }
+}
+
+/**
+ * Lightweight, standalone age capture for ANY signed-in user — not gated
+ * behind the full Meet Me profile (displayName/gender/lookingFor). Lets the
+ * app-wide age prompt (AgePromptDialog) merge just this one field onto
+ * users/{uid}, which composes with saveProfileAction later: a user who
+ * answers this and later opts into Meet Me won't be asked for age again.
+ */
+export async function saveAccountAgeAction(
+  idToken: string,
+  age: number
+): Promise<{ success: boolean; error?: string }> {
+  const authCheck = await verifyUserIdToken(idToken);
+  if (!authCheck.ok) return { success: false, error: authCheck.error };
+
+  if (!adminFirestore) return { success: false, error: "Server Firestore (Admin) not initialized" };
+
+  const validation = AccountAgeSchema.safeParse(age);
+  if (!validation.success) {
+    return { success: false, error: "Please enter a valid age (18+)." };
+  }
+
+  try {
+    await adminFirestore.collection("users").doc(authCheck.uid).set(
+      { age: validation.data, updatedAt: Timestamp.now() },
+      { merge: true }
+    );
+    return { success: true };
+  } catch (error: any) {
+    console.error("Error saving account age:", error);
+    return { success: false, error: error.message || "Failed to save age." };
+  }
+}
+
+/**
+ * Records that the user dismissed the age prompt so it doesn't reappear on
+ * every session — a permanent skip, not a snooze.
+ */
+export async function skipAccountAgeAction(idToken: string): Promise<{ success: boolean; error?: string }> {
+  const authCheck = await verifyUserIdToken(idToken);
+  if (!authCheck.ok) return { success: false, error: authCheck.error };
+
+  if (!adminFirestore) return { success: false, error: "Server Firestore (Admin) not initialized" };
+
+  try {
+    await adminFirestore.collection("users").doc(authCheck.uid).set(
+      { ageSkipped: true, updatedAt: Timestamp.now() },
+      { merge: true }
+    );
+    return { success: true };
+  } catch (error: any) {
+    console.error("Error skipping account age prompt:", error);
+    return { success: false, error: error.message || "Failed to save." };
+  }
+}
+
+/**
+ * Batch-fetches on-file ages for a set of uids, for the admin analytics
+ * dashboard's age-distribution chart. Uids with no on-file age are simply
+ * omitted from the result, not zero-filled.
+ */
+export async function getAgesForUids(idToken: string, uids: string[]): Promise<Record<string, number>> {
+  const authCheck = await verifyAdminIdToken(idToken);
+  if (!authCheck.ok) {
+    console.warn("getAgesForUids: unauthorized caller.", authCheck.error);
+    return {};
+  }
+
+  if (!adminFirestore || uids.length === 0) return {};
+
+  const uniqueUids = Array.from(new Set(uids));
+
+  try {
+    const refs = uniqueUids.map((uid) => adminFirestore!.collection("users").doc(uid));
+    const snaps = await adminFirestore.getAll(...refs);
+    const result: Record<string, number> = {};
+    snaps.forEach((snap, i) => {
+      const age = snap.data()?.age;
+      if (snap.exists && typeof age === "number") {
+        result[uniqueUids[i]] = age;
+      }
+    });
+    return result;
+  } catch (error) {
+    console.error("Error fetching ages for uids:", error);
+    return {};
   }
 }
 
