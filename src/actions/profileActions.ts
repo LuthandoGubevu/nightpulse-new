@@ -154,6 +154,60 @@ export async function getAgesForUids(idToken: string, uids: string[]): Promise<R
   }
 }
 
+const SignupProfileSchema = z.object({
+  displayName: z.string().trim().min(1).max(80),
+  // Same 18+ floor as the rest of the app — this is also the first place that
+  // floor is actually enforced for a plain email/password sign-up, not just Meet Me.
+  age: z.number().int().min(18).max(120),
+  gender: z.enum(["man", "woman", "non-binary"]).optional(),
+});
+
+/**
+ * Persists the name/age/gender collected on the manual (non-Google) sign-up
+ * form to users/{uid}. Google sign-ups don't call this — Google already
+ * supplies a display name, and age/gender there are instead picked up later
+ * via the existing account-level AgePromptDialog / Meet Me profile setup.
+ * Deliberately reuses the same fields saveProfileAction writes (displayName,
+ * age, gender, blockedUids, createdAt) so this composes for free with Meet Me:
+ * a user who filled this in at sign-up won't be asked for age again, and only
+ * needs a photo + looking-for to complete a full Meet Me profile later.
+ */
+export async function saveSignupProfileAction(
+  idToken: string,
+  data: { displayName: string; age: number; gender?: string }
+): Promise<{ success: boolean; error?: string }> {
+  const authCheck = await verifyUserIdToken(idToken);
+  if (!authCheck.ok) return { success: false, error: authCheck.error };
+
+  if (!adminFirestore) return { success: false, error: "Server Firestore (Admin) not initialized" };
+
+  const validation = SignupProfileSchema.safeParse(data);
+  if (!validation.success) {
+    return { success: false, error: validation.error.issues[0]?.message || "Invalid sign-up details." };
+  }
+
+  try {
+    const userRef = adminFirestore.collection("users").doc(authCheck.uid);
+    const now = Timestamp.now();
+    const existing = await userRef.get();
+    await userRef.set(
+      {
+        displayName: validation.data.displayName,
+        age: validation.data.age,
+        ...(validation.data.gender ? { gender: validation.data.gender } : {}),
+        blockedUids: existing.exists ? existing.data()?.blockedUids ?? [] : [],
+        createdAt: existing.exists ? existing.data()?.createdAt ?? now : now,
+        updatedAt: now,
+      },
+      { merge: true }
+    );
+    return { success: true };
+  } catch (error: any) {
+    console.error("Error saving sign-up profile:", error);
+    return { success: false, error: error.message || "Failed to save profile." };
+  }
+}
+
 /**
  * Records that the signed-in user has agreed to the Terms of Service, with a
  * timestamp — the checkbox alone proves nothing later without a persisted
