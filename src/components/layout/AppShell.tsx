@@ -15,6 +15,7 @@ import {
   SidebarMenuItem,
   SidebarMenuButton,
   SidebarTrigger,
+  useSidebar,
 } from "@/components/ui/sidebar";
 import { siteConfig } from "@/config/site";
 import { Icons } from "@/components/icons";
@@ -34,12 +35,18 @@ export default function AppShell({ children }: AppShellProps) {
   const router = useRouter();
   const { user, loading: authLoading } = useAuth();
   const { toast } = useToast();
+  const { isMobile, setOpenMobile } = useSidebar();
+
+  const closeSidebarOnMobile = () => {
+    if (isMobile) setOpenMobile(false);
+  };
 
   const handleSignOut = async () => {
     if (!auth) {
       toast({ title: "Error", description: "Firebase Auth not initialized.", variant: "destructive" });
       return;
     }
+    closeSidebarOnMobile();
     try {
       await signOut(auth);
       toast({ title: "Signed Out", description: "You have been successfully signed out." });
@@ -82,7 +89,7 @@ export default function AppShell({ children }: AppShellProps) {
           className="border-r"
         >
           <SidebarHeader className="p-4">
-            <Link href="/dashboard" className="flex items-center space-x-2">
+            <Link href="/dashboard" className="flex items-center space-x-2" onClick={closeSidebarOnMobile}>
               <Icons.logo className="h-7 w-7 text-primary" />
               <span className="font-bold font-headline text-lg group-data-[collapsible=icon]:hidden">
                 {siteConfig.name}
@@ -107,7 +114,7 @@ export default function AppShell({ children }: AppShellProps) {
                         tooltip={item.title}
                         className="w-full justify-start"
                       >
-                        <Link href={item.href}>
+                        <Link href={item.href} onClick={closeSidebarOnMobile}>
                           {IconComponent && <IconComponent className="h-4 w-4" />}
                           <span className="group-data-[collapsible=icon]:hidden">{item.title}</span>
                         </Link>
@@ -151,7 +158,7 @@ export default function AppShell({ children }: AppShellProps) {
                 </div>
               ) : (
                 <Button variant="ghost" asChild className="w-full justify-start group-data-[collapsible=icon]:justify-center">
-                  <Link href="/auth">
+                  <Link href="/auth" onClick={closeSidebarOnMobile}>
                     <Icons.logIn className="h-4 w-4" />
                     <span className="group-data-[collapsible=icon]:hidden">Sign In</span>
                   </Link>
