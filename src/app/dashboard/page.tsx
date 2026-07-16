@@ -10,8 +10,6 @@ import { getMyRatingsAction } from "@/actions/ratingActions";
 import type { ClubWithId, UserLocation } from "@/types";
 import { ClubList } from "@/components/clubs/ClubList";
 import { PageHeader } from "@/components/common/PageHeader";
-import ClubMapWrapper from "@/components/clubs/ClubMapWrapper";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Icons } from "@/components/icons";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
@@ -413,22 +411,9 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      <Tabs defaultValue="list" className="mt-6">
-        <TabsList className="grid w-full grid-cols-2 md:w-96">
-          <TabsTrigger value="list">
-            <Icons.users className="mr-2 h-4 w-4" /> List View
-          </TabsTrigger>
-          <TabsTrigger value="map">
-            <Icons.mapPin className="mr-2 h-4 w-4" /> Map View
-          </TabsTrigger>
-        </TabsList>
-        <TabsContent value="list" className="mt-6">
-           <ClubList clubs={clubsWithLiveCountsAndDistance} activeGeofenceClubId={activeGeofenceClubId} />
-        </TabsContent>
-        <TabsContent value="map" className="mt-6">
-          <ClubMapWrapper clubs={clubsWithLiveCountsAndDistance} />
-        </TabsContent>
-      </Tabs>
+      <div className="mt-6">
+        <ClubList clubs={clubsWithLiveCountsAndDistance} activeGeofenceClubId={activeGeofenceClubId} />
+      </div>
     </div>
   );
 }
