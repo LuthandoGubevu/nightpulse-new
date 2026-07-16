@@ -57,6 +57,7 @@ export default function ChatThreadPage() {
   const [isSending, setIsSending] = useState(false);
   const [showReportDialog, setShowReportDialog] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const seenMessageIdsRef = useRef<Set<string> | null>(null);
 
   const otherUid = conversation?.participantUids.find((uid) => uid !== user?.uid) ?? null;
 
@@ -101,12 +102,30 @@ export default function ChatThreadPage() {
 
   useEffect(() => {
     if (!firestore || loadState !== "ready") return;
+    seenMessageIdsRef.current = null; // reset baseline when switching threads
+
     const q = query(collection(firestore, "conversations", conversationId, "messages"), orderBy("createdAt", "asc"));
     const unsubscribe = onSnapshot(q, (snapshot) => {
       setMessages(snapshot.docs.map((d) => ({ id: d.id, ...(d.data() as any) }) as ChatMessageWithId));
+
+      if (seenMessageIdsRef.current === null) {
+        // Baseline on first load: don't vibrate for messages that already existed.
+        seenMessageIdsRef.current = new Set(snapshot.docs.map((d) => d.id));
+        return;
+      }
+      let hasNewIncomingMessage = false;
+      snapshot.docChanges().forEach((change) => {
+        if (change.type === "added" && !seenMessageIdsRef.current!.has(change.doc.id)) {
+          seenMessageIdsRef.current!.add(change.doc.id);
+          if (change.doc.data().senderUid !== user?.uid) hasNewIncomingMessage = true;
+        }
+      });
+      if (hasNewIncomingMessage && typeof navigator !== "undefined" && "vibrate" in navigator) {
+        navigator.vibrate(200);
+      }
     });
     return () => unsubscribe();
-  }, [conversationId, loadState]);
+  }, [conversationId, loadState, user?.uid]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });

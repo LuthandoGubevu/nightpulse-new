@@ -314,3 +314,56 @@ export async function getRecentHeartbeats(idToken: string, sinceMillis: number):
     return [];
   }
 }
+
+export interface VisitSessionRecord {
+  id: string;
+  deviceId: string;
+  uid: string | null;
+  clubId: string;
+  firstSeen: string; // ISO string
+  lastSeen: string; // ISO string
+}
+
+/**
+ * Fetches discrete visit sessions (one per continuous stay, gap-separated —
+ * see visitSessions writes in /api/heartbeat) active since the given time.
+ * Used for average-dwell-time, corrected new-vs-returning, and age-distribution
+ * analytics, which all need real per-visit history rather than the single
+ * always-overwritten `visits/{deviceId}` doc that getRecentHeartbeats reads.
+ */
+export async function getRecentVisitSessions(idToken: string, sinceMillis: number): Promise<VisitSessionRecord[]> {
+  const authCheck = await verifyAdminIdToken(idToken);
+  if (!authCheck.ok) {
+    console.warn("getRecentVisitSessions: unauthorized caller.", authCheck.error);
+    return [];
+  }
+
+  if (!adminFirestore) {
+    console.warn("Firestore admin not initialized in getRecentVisitSessions. Returning empty list.");
+    return [];
+  }
+
+  try {
+    const querySnapshot = await adminFirestore
+      .collection('visitSessions')
+      .where('lastSeen', '>=', Timestamp.fromMillis(sinceMillis))
+      .get();
+
+    return querySnapshot.docs.map((docSnap) => {
+      const data = docSnap.data();
+      const firstSeen = isTimestampLike(data.firstSeen) ? data.firstSeen.toDate().toISOString() : new Date().toISOString();
+      const lastSeen = isTimestampLike(data.lastSeen) ? data.lastSeen.toDate().toISOString() : new Date().toISOString();
+      return {
+        id: docSnap.id,
+        deviceId: data.deviceId || "",
+        uid: data.uid ?? null,
+        clubId: data.clubId || "",
+        firstSeen,
+        lastSeen,
+      };
+    });
+  } catch (error) {
+    console.error('Error fetching recent visit sessions:', error);
+    return [];
+  }
+}
