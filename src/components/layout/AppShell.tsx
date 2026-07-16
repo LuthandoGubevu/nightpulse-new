@@ -70,7 +70,7 @@ export default function AppShell({ children }: AppShellProps) {
     return true; // Home (and anything else ungated) always shows
   }), [user, authLoading]);
 
-  const showFullAppLayout = pathname !== "/" && pathname !== "/auth";
+  const showFullAppLayout = pathname !== "/" && pathname !== "/auth" && pathname !== "/terms";
 
   if (!showFullAppLayout) {
     return (

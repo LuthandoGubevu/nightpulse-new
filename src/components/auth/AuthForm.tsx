@@ -5,19 +5,25 @@ import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
   GoogleAuthProvider,
   signInWithPopup,
+  getAdditionalUserInfo,
+  updateProfile,
 } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
+import { recordTermsAcceptanceAction, saveSignupProfileAction } from "@/actions/profileActions";
 import { Icons } from "@/components/icons";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   Form,
   FormControl,
@@ -36,9 +42,25 @@ const signInSchema = z.object({
 
 const signUpSchema = z
   .object({
+    firstName: z.string().trim().min(1, "First name is required."),
+    lastName: z.string().trim().min(1, "Last name is required."),
+    // Kept as a string (matching a native number input's actual value type) and
+    // range-checked via refine, rather than z.coerce.number() — avoids fighting
+    // react-hook-form's default-value typing for a field that's often empty.
+    age: z.string().min(1, "Age is required.").refine((v) => {
+      const n = Number(v);
+      return Number.isInteger(n) && n >= 18 && n <= 120;
+    }, "You must be 18 or older to use Vybi."),
+    // Optional, unlike Meet Me's own profile setup — asking every signee to
+    // declare a gender at account creation (not just those opting into Meet Me)
+    // is more sensitive personal information than we need to make mandatory here.
+    gender: z.enum(["man", "woman", "non-binary"]).optional(),
     email: z.string().email("Enter a valid email address."),
     password: z.string().min(6, "Password must be at least 6 characters."),
     confirmPassword: z.string(),
+    agreedToTerms: z.boolean().refine((v) => v === true, {
+      message: "You must agree to the Terms of Service to create an account.",
+    }),
   })
   .refine((data) => data.password === data.confirmPassword, {
     message: "Passwords do not match.",
@@ -105,7 +127,16 @@ export function AuthForm() {
 
   const signUpForm = useForm<SignUpValues>({
     resolver: zodResolver(signUpSchema),
-    defaultValues: { email: "", password: "", confirmPassword: "" },
+    defaultValues: {
+      firstName: "",
+      lastName: "",
+      age: "",
+      gender: undefined,
+      email: "",
+      password: "",
+      confirmPassword: "",
+      agreedToTerms: false,
+    },
     mode: "onChange",
   });
 
@@ -133,7 +164,22 @@ export function AuthForm() {
     }
     setIsSubmitting(true);
     try {
-      await createUserWithEmailAndPassword(auth, values.email, values.password);
+      const credential = await createUserWithEmailAndPassword(auth, values.email, values.password);
+      const fullName = `${values.firstName.trim()} ${values.lastName.trim()}`.trim();
+      // Mirrors what Google Sign-In already gives us for free, so both paths leave
+      // user.displayName populated consistently (e.g. for the sidebar footer).
+      await updateProfile(credential.user, { displayName: fullName });
+
+      const idToken = await credential.user.getIdToken();
+      recordTermsAcceptanceAction(idToken).catch((error) =>
+        console.error("Failed to record terms acceptance:", error)
+      );
+      saveSignupProfileAction(idToken, {
+        displayName: fullName,
+        age: parseInt(values.age, 10),
+        gender: values.gender,
+      }).catch((error) => console.error("Failed to save sign-up profile:", error));
+
       toast({ title: "Account Created", description: "Welcome to Vybi." });
       router.push(redirectTo);
     } catch (error: any) {
@@ -150,7 +196,17 @@ export function AuthForm() {
     }
     setIsGoogleSubmitting(true);
     try {
-      await signInWithPopup(auth, new GoogleAuthProvider());
+      const result = await signInWithPopup(auth, new GoogleAuthProvider());
+      // Google Sign-In doubles as sign-up for a brand-new account — record
+      // acceptance for that case too, since clicking through was their only
+      // consent gesture (they see the "By continuing..." notice below, not a
+      // checkbox — a returning user shouldn't be asked to re-tick one every login).
+      if (getAdditionalUserInfo(result)?.isNewUser) {
+        const idToken = await result.user.getIdToken();
+        recordTermsAcceptanceAction(idToken).catch((error) =>
+          console.error("Failed to record terms acceptance:", error)
+        );
+      }
       toast({ title: "Welcome", description: "Signed in with Google." });
       router.push(redirectTo);
     } catch (error: any) {
@@ -227,6 +283,73 @@ export function AuthForm() {
           <TabsContent value="signup" className="mt-4">
             <Form {...signUpForm}>
               <form onSubmit={signUpForm.handleSubmit(onSignUp)} className="space-y-4">
+                <div className="grid grid-cols-2 gap-3">
+                  <FormField
+                    control={signUpForm.control}
+                    name="firstName"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>
+                          <Icons.userRound className="mr-1 inline h-4 w-4" /> First Name
+                        </FormLabel>
+                        <FormControl>
+                          <Input placeholder="Jane" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={signUpForm.control}
+                    name="lastName"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Last Name</FormLabel>
+                        <FormControl>
+                          <Input placeholder="Doe" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <FormField
+                    control={signUpForm.control}
+                    name="age"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Age</FormLabel>
+                        <FormControl>
+                          <Input type="number" inputMode="numeric" placeholder="18+" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={signUpForm.control}
+                    name="gender"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Gender <span className="text-muted-foreground font-normal">(optional)</span></FormLabel>
+                        <Select value={field.value} onValueChange={field.onChange}>
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="man">Man</SelectItem>
+                            <SelectItem value="woman">Woman</SelectItem>
+                            <SelectItem value="non-binary">Non-binary</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
                 <FormField
                   control={signUpForm.control}
                   name="email"
@@ -272,7 +395,36 @@ export function AuthForm() {
                     </FormItem>
                   )}
                 />
-                <Button type="submit" className="w-full" disabled={isBusy}>
+                <FormField
+                  control={signUpForm.control}
+                  name="agreedToTerms"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-row items-start space-x-2 space-y-0">
+                      <FormControl>
+                        <Checkbox checked={field.value} onCheckedChange={field.onChange} />
+                      </FormControl>
+                      <div className="space-y-1 leading-none">
+                        <FormLabel className="font-normal text-sm">
+                          I agree to the{" "}
+                          <Link
+                            href="/terms"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-accent underline"
+                          >
+                            Terms of Service
+                          </Link>
+                        </FormLabel>
+                        <FormMessage />
+                      </div>
+                    </FormItem>
+                  )}
+                />
+                <Button
+                  type="submit"
+                  className="w-full"
+                  disabled={isBusy || !signUpForm.watch("agreedToTerms")}
+                >
                   {isSubmitting ? (
                     <Icons.spinner className="mr-2 h-4 w-4 animate-spin" />
                   ) : (
@@ -302,6 +454,13 @@ export function AuthForm() {
           )}
           Sign in with Google
         </Button>
+        <p className="text-center text-xs text-muted-foreground">
+          By continuing with Google, you agree to our{" "}
+          <Link href="/terms" target="_blank" rel="noopener noreferrer" className="text-accent underline">
+            Terms of Service
+          </Link>
+          .
+        </p>
       </CardContent>
     </Card>
   );
