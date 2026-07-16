@@ -42,6 +42,13 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    // Discrete visit-session history (one doc per continuous stay), written
+    // only by the Admin SDK from /api/heartbeat. Same lockdown as visits above —
+    // used for dwell-time, new-vs-returning, and age-distribution analytics.
+    match /visitSessions/{sessionId} {
+      allow read, write: if false;
+    }
+
     // "Meet Me" feature — user profiles:
     // - Writes go exclusively through profileActions.ts (Admin SDK), which validates
     //   displayName/photoUrl before writing.

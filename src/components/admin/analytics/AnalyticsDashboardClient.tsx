@@ -11,11 +11,13 @@ import { Icons } from "@/components/icons";
 import { ClubRatingIndicator } from "@/components/clubs/ClubRatingIndicator";
 import { HourlyVisitorsChart } from "./HourlyVisitorsChart";
 import { BusiestDayChart } from "./BusiestDayChart";
+import { AgeDistributionChart } from "./AgeDistributionChart";
 import { VisitMetricsWidget } from "./VisitMetricsWidget";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { cn } from "@/lib/utils";
-import { getLiveClubCounts, getRecentHeartbeats, type HeartbeatRecord } from "@/actions/clubActions";
+import { getLiveClubCounts, getRecentHeartbeats, getRecentVisitSessions, type HeartbeatRecord, type VisitSessionRecord } from "@/actions/clubActions";
+import { getAgesForUids } from "@/actions/profileActions";
 
 interface ClubOption {
   id: string;
@@ -58,30 +60,84 @@ function processBusiestDayData(heartbeats: HeartbeatRecord[]) {
   return Object.entries(dailyCounts).map(([name, visitors]) => ({ name, visitors }));
 }
 
-// Visit metrics might be less meaningful with only heartbeats (no explicit exit times).
-// For now, focusing on new vs returning based on unique device IDs seen. Avg duration is N/A.
-function processVisitMetrics(heartbeats: HeartbeatRecord[]) {
-  const deviceVisits: { [key: string]: number } = {}; // deviceId -> count of heartbeats
+function formatDuration(totalMinutes: number): string {
+  if (!isFinite(totalMinutes) || totalMinutes < 1) return "< 1 min";
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = Math.round(totalMinutes % 60);
+  if (hours === 0) return `${minutes} min`;
+  return `${hours}h ${minutes}m`;
+}
 
-  heartbeats.forEach((hb) => {
-    if (hb.deviceId) {
-      deviceVisits[hb.deviceId] = (deviceVisits[hb.deviceId] || 0) + 1;
+// Built from visitSessions (one doc per continuous, gap-separated stay — see
+// /api/heartbeat) rather than raw heartbeats, since average dwell time and a
+// real new-vs-returning split both need per-visit history, not just each
+// device's single always-overwritten `visits/{deviceId}` row.
+function processVisitMetrics(sessions: VisitSessionRecord[]) {
+  if (sessions.length === 0) {
+    return { avgDuration: "N/A", newVsReturning: { new: 0, returning: 0 } };
+  }
+
+  const totalMinutes = sessions.reduce((sum, session) => {
+    const durationMs = new Date(session.lastSeen).getTime() - new Date(session.firstSeen).getTime();
+    return sum + Math.max(0, durationMs) / 60000;
+  }, 0);
+
+  const sessionsByDevice: { [key: string]: number } = {};
+  sessions.forEach((session) => {
+    if (session.deviceId) {
+      sessionsByDevice[session.deviceId] = (sessionsByDevice[session.deviceId] || 0) + 1;
     }
   });
 
   let newVisitors = 0;
-  let returningVisitors = 0; // A device is "returning" if it has sent multiple heartbeats over time.
-  const heartbeatThresholdForReturning = 3; // Arbitrary: >3 heartbeats counts as a 'longer' presence
-
-  Object.values(deviceVisits).forEach((count) => {
-    if (count <= heartbeatThresholdForReturning) newVisitors++;
+  let returningVisitors = 0; // A device is "returning" if it had more than one distinct visit in the window.
+  Object.values(sessionsByDevice).forEach((count) => {
+    if (count <= 1) newVisitors++;
     else returningVisitors++;
   });
 
   return {
-    avgDuration: `N/A (Heartbeats)`,
+    avgDuration: formatDuration(totalMinutes / sessions.length),
     newVsReturning: { new: newVisitors, returning: returningVisitors },
   };
+}
+
+const AGE_BUCKETS = ["18-24", "25-34", "35-44", "45-54", "55-64", "65+"];
+
+function bucketForAge(age: number): string {
+  if (age <= 24) return "18-24";
+  if (age <= 34) return "25-34";
+  if (age <= 44) return "35-44";
+  if (age <= 54) return "45-54";
+  if (age <= 64) return "55-64";
+  return "65+";
+}
+
+// Buckets by distinct visitor (uid), not by session, so a patron who visited
+// three times in the window counts once toward the age split, not three times.
+function processAgeDistribution(sessions: VisitSessionRecord[], agesByUid: Record<string, number>) {
+  const counts: { [key: string]: number } = {};
+  AGE_BUCKETS.forEach((bucket) => (counts[bucket] = 0));
+
+  const seenUids = new Set<string>();
+  let withAge = 0;
+
+  sessions.forEach((session) => {
+    if (!session.uid || seenUids.has(session.uid)) return;
+    seenUids.add(session.uid);
+    const age = agesByUid[session.uid];
+    if (typeof age === "number") {
+      withAge++;
+      counts[bucketForAge(age)]++;
+    }
+  });
+
+  const data = AGE_BUCKETS.map((name) => ({
+    name,
+    percent: withAge > 0 ? Math.round((counts[name] / withAge) * 1000) / 10 : 0,
+  }));
+
+  return { data, withAge, totalDistinctVisitors: seenUids.size };
 }
 
 export function AnalyticsDashboardClient() {
@@ -91,6 +147,8 @@ export function AnalyticsDashboardClient() {
   const [selectedClubId, setSelectedClubId] = useState<string>("all");
 
   const [allHeartbeats, setAllHeartbeats] = useState<HeartbeatRecord[]>([]);
+  const [allSessions, setAllSessions] = useState<VisitSessionRecord[]>([]);
+  const [agesByUid, setAgesByUid] = useState<Record<string, number>>({});
   const [loadingHistorical, setLoadingHistorical] = useState(true);
   const [firestoreError, setFirestoreError] = useState<string | null>(null);
 
@@ -139,27 +197,43 @@ export function AnalyticsDashboardClient() {
   }, []);
 
   useEffect(() => {
-    async function fetchHeartbeats() {
+    async function fetchHistoricalData() {
       setLoadingHistorical(true);
       try {
         const idToken = await auth?.currentUser?.getIdToken();
         if (!idToken) {
           setFirestoreError("You must be signed in as an admin to view analytics.");
           setAllHeartbeats([]);
+          setAllSessions([]);
+          setAgesByUid({});
         } else {
           const thirtyDaysAgo = new Date();
           thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-          setAllHeartbeats(await getRecentHeartbeats(idToken, thirtyDaysAgo.getTime()));
+          const sinceMillis = thirtyDaysAgo.getTime();
+          const [heartbeats, sessions] = await Promise.all([
+            getRecentHeartbeats(idToken, sinceMillis),
+            getRecentVisitSessions(idToken, sinceMillis),
+          ]);
+          setAllHeartbeats(heartbeats);
+          setAllSessions(sessions);
+
+          // Ages are fetched once for every distinct linked uid across the whole
+          // 30-day window (not re-filtered by club), so switching the club
+          // dropdown below doesn't trigger another round trip.
+          const uids = Array.from(new Set(sessions.map((s) => s.uid).filter((uid): uid is string => !!uid)));
+          setAgesByUid(uids.length > 0 ? await getAgesForUids(idToken, uids) : {});
         }
       } catch (error) {
-        console.error("Error fetching historical heartbeat data for analytics:", error);
+        console.error("Error fetching historical analytics data:", error);
         setFirestoreError("Failed to load analytics data from Firestore.");
         setAllHeartbeats([]);
+        setAllSessions([]);
+        setAgesByUid({});
       } finally {
         setLoadingHistorical(false);
       }
     }
-    fetchHeartbeats();
+    fetchHistoricalData();
   }, []);
 
   const filteredHeartbeats = useMemo(
@@ -167,9 +241,18 @@ export function AnalyticsDashboardClient() {
     [allHeartbeats, selectedClubId]
   );
 
+  const filteredSessions = useMemo(
+    () => (selectedClubId === "all" ? allSessions : allSessions.filter((s) => s.clubId === selectedClubId)),
+    [allSessions, selectedClubId]
+  );
+
   const hourlyData = useMemo(() => processHourlyData(filteredHeartbeats), [filteredHeartbeats]);
   const busiestDayData = useMemo(() => processBusiestDayData(filteredHeartbeats), [filteredHeartbeats]);
-  const visitMetrics = useMemo(() => processVisitMetrics(filteredHeartbeats), [filteredHeartbeats]);
+  const visitMetrics = useMemo(() => processVisitMetrics(filteredSessions), [filteredSessions]);
+  const ageDistribution = useMemo(
+    () => processAgeDistribution(filteredSessions, agesByUid),
+    [filteredSessions, agesByUid]
+  );
 
   const selectedClub = selectedClubId === "all" ? null : clubs.find((c) => c.id === selectedClubId) ?? null;
 
@@ -287,6 +370,34 @@ export function AnalyticsDashboardClient() {
           </CardHeader>
           <CardContent className="pl-2">
             {loadingHistorical ? <Skeleton className="h-72 w-full" /> : <BusiestDayChart data={busiestDayData} />}
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="grid gap-6 md:grid-cols-1">
+        <Card>
+          <CardHeader>
+            <CardTitle>Visitor Age Distribution (Last 30 Days)</CardTitle>
+            <CardDescription>
+              Share of distinct visitors by age bracket{selectedClub ? ` at ${selectedClub.name}` : ""}, based on age
+              provided at sign-up.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="pl-2">
+            {loadingHistorical ? (
+              <Skeleton className="h-72 w-full" />
+            ) : (
+              <>
+                <AgeDistributionChart data={ageDistribution.data} />
+                {ageDistribution.totalDistinctVisitors > 0 && (
+                  <p className="text-xs text-muted-foreground mt-2">
+                    Age on file for {ageDistribution.withAge} of {ageDistribution.totalDistinctVisitors} distinct
+                    visitors in this window ({Math.round((ageDistribution.withAge / ageDistribution.totalDistinctVisitors) * 100)}%). The
+                    rest haven&apos;t shared their age yet.
+                  </p>
+                )}
+              </>
+            )}
           </CardContent>
         </Card>
       </div>

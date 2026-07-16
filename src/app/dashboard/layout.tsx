@@ -7,6 +7,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { PageHeader } from "@/components/common/PageHeader";
 import { Icons } from "@/components/icons";
 import { MatchNotificationListener } from "@/components/meetme/MatchNotificationListener";
+import { AgePromptDialog } from "@/components/common/AgePromptDialog";
 
 export default function DashboardLayout({
   children,
@@ -46,6 +47,7 @@ export default function DashboardLayout({
   return (
     <>
       <MatchNotificationListener />
+      <AgePromptDialog />
       {children}
     </>
   );
