@@ -33,8 +33,8 @@ export default function TermsPage() {
           so a couple of business-specific details (like our formal dispute-resolution process)
           are still being confirmed. Everything about how your data is used, and how Meet&nbsp;Me
           works, is accurate today. Questions in the meantime:{" "}
-          <a href="mailto:hello@nightpulse.app" className="text-accent underline">
-            hello@nightpulse.app
+          <a href="mailto:hello@vybi.co.za" className="text-accent underline">
+            hello@vybi.co.za
           </a>
           .
         </p>
@@ -65,7 +65,7 @@ export default function TermsPage() {
         <p>
           Vybi does not knowingly collect personal information from anyone under 18. If we become aware that we
           have, we will delete it and terminate the associated account. If you believe a user is under 18, please
-          report it to <a href="mailto:hello@nightpulse.app">hello@nightpulse.app</a>.
+          report it to <a href="mailto:hello@vybi.co.za">hello@vybi.co.za</a>.
         </p>
       </Section>
 
@@ -85,7 +85,7 @@ export default function TermsPage() {
       <Section id="your-account" title="3. Your Account">
         <p>You're responsible for keeping your login credentials confidential and for all activity under your account.</p>
         <p>You may sign up with email/password or Google Sign-In. Using Google Sign-In also means you agree to Google's own terms governing that sign-in method.</p>
-        <p>Notify us promptly at <a href="mailto:hello@nightpulse.app">hello@nightpulse.app</a> if you become aware of unauthorized use of your account. Don't create an account on behalf of someone else or use a false identity.</p>
+        <p>Notify us promptly at <a href="mailto:hello@vybi.co.za">hello@vybi.co.za</a> if you become aware of unauthorized use of your account. Don't create an account on behalf of someone else or use a false identity.</p>
       </Section>
 
       <Section id="data" title="4. Data We Collect and How We Use It">
@@ -109,7 +109,7 @@ export default function TermsPage() {
         <p className="text-foreground font-medium">4.4. Sharing your information</p>
         <p>We do not sell your personal information. We share it: with <strong>other Meet Me users</strong>, limited to the minimal profile shown to them while you're opted in; with <strong>venues</strong>, only as aggregated, de-identified analytics; with <strong>service providers</strong> (currently Google/Firebase for auth, database, storage, and hosting) under confidentiality obligations; and where required by law.</p>
         <p className="text-foreground font-medium">4.5. Your rights</p>
-        <p>Subject to applicable law (including POPIA, where you're in South Africa), you can request access to, correction of, or deletion of your personal information, and object to direct marketing at any time, free of charge, by contacting <a href="mailto:hello@nightpulse.app">hello@nightpulse.app</a>.</p>
+        <p>Subject to applicable law (including POPIA, where you're in South Africa), you can request access to, correction of, or deletion of your personal information, and object to direct marketing at any time, free of charge, by contacting <a href="mailto:hello@vybi.co.za">hello@vybi.co.za</a>.</p>
         <p className="text-foreground font-medium">4.6. Retention and deletion</p>
         <p>We retain your data while your account is active. If you delete your account, we delete or anonymize your personal information, except where we must retain records for legal or open-safety-report reasons, or where data is already irreversibly aggregated.</p>
       </Section>
@@ -143,7 +143,7 @@ export default function TermsPage() {
         <p className="text-foreground font-medium">Prohibited conduct on Meet Me.</p>
         <p>You agree not to: impersonate any person or misrepresent your age or identity; harass, threaten, or stalk another user, in the app or after; solicit or offer commercial sexual services; contact someone after being blocked or after they've asked you not to; use Meet Me if you're required to register as a sex offender in any jurisdiction; or use Meet Me for anything other than genuine, voluntary social interaction.</p>
         <p className="text-foreground font-medium">Reporting, blocking, and moderation.</p>
-        <p>You can block any user at any time — a blocked user can't see you in discovery or match with you again. You can report any user for conduct that violates these Terms; we review reports and may warn, suspend, or terminate any account, or remove content, at our discretion. Consistent with app-marketplace requirements for apps enabling user-to-user contact, we provide in-app reporting and blocking, act on reports in a timely manner, and publish a working contact method (<a href="mailto:hello@nightpulse.app">hello@nightpulse.app</a>).</p>
+        <p>You can block any user at any time — a blocked user can't see you in discovery or match with you again. You can report any user for conduct that violates these Terms; we review reports and may warn, suspend, or terminate any account, or remove content, at our discretion. Consistent with app-marketplace requirements for apps enabling user-to-user contact, we provide in-app reporting and blocking, act on reports in a timely manner, and publish a working contact method (<a href="mailto:hello@vybi.co.za">hello@vybi.co.za</a>).</p>
         <p className="text-foreground font-medium">No liability for user conduct or content.</p>
         <p>To the fullest extent permitted by law, Vybi is not liable for any loss, injury, or damage arising from your interaction with another user, in the app or in person. We do not routinely review chat messages between matched users, and are not responsible for their content except where reported to us.</p>
         <p className="text-foreground font-medium">Indemnification.</p>
@@ -171,7 +171,7 @@ export default function TermsPage() {
       </Section>
 
       <Section id="termination" title="13. Termination">
-        <p>You may stop using the Service and delete your account at any time by contacting <a href="mailto:hello@nightpulse.app">hello@nightpulse.app</a>. We may suspend or terminate your account if we reasonably believe you've violated these Terms or for any other reason at our discretion, including to comply with legal requirements.</p>
+        <p>You may stop using the Service and delete your account at any time by contacting <a href="mailto:hello@vybi.co.za">hello@vybi.co.za</a>. We may suspend or terminate your account if we reasonably believe you've violated these Terms or for any other reason at our discretion, including to comply with legal requirements.</p>
       </Section>
 
       <Section id="law" title="14. Governing Law and Disputes">
@@ -183,12 +183,12 @@ export default function TermsPage() {
       </Section>
 
       <Section id="contact" title="16. Contact Us">
-        <p>Questions about these Terms or your data: <a href="mailto:hello@nightpulse.app">hello@nightpulse.app</a>.</p>
+        <p>Questions about these Terms or your data: <a href="mailto:hello@vybi.co.za">hello@vybi.co.za</a>.</p>
       </Section>
 
       <p className="text-xs text-muted-foreground border-t pt-6">
         Have questions about how Vybi handles your data or Meet&nbsp;Me? Reach us at{" "}
-        <a href="mailto:hello@nightpulse.app" className="text-accent underline">hello@nightpulse.app</a>. Back to{" "}
+        <a href="mailto:hello@vybi.co.za" className="text-accent underline">hello@vybi.co.za</a>. Back to{" "}
         <Link href="/" className="text-accent underline">home</Link>.
       </p>
     </div>
