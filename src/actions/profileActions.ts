@@ -154,6 +154,31 @@ export async function getAgesForUids(idToken: string, uids: string[]): Promise<R
   }
 }
 
+/**
+ * Records that the signed-in user has agreed to the Terms of Service, with a
+ * timestamp — the checkbox alone proves nothing later without a persisted
+ * record of who agreed and when. Called right after the account-creation
+ * paths that actually required ticking the box (manual sign-up, and a
+ * first-time Google sign-in reached from the Sign Up tab).
+ */
+export async function recordTermsAcceptanceAction(idToken: string): Promise<{ success: boolean; error?: string }> {
+  const authCheck = await verifyUserIdToken(idToken);
+  if (!authCheck.ok) return { success: false, error: authCheck.error };
+
+  if (!adminFirestore) return { success: false, error: "Server Firestore (Admin) not initialized" };
+
+  try {
+    await adminFirestore.collection("users").doc(authCheck.uid).set(
+      { termsAcceptedAt: Timestamp.now() },
+      { merge: true }
+    );
+    return { success: true };
+  } catch (error: any) {
+    console.error("Error recording terms acceptance:", error);
+    return { success: false, error: error.message || "Failed to save." };
+  }
+}
+
 export async function blockUserAction(
   idToken: string,
   blockedUid: string

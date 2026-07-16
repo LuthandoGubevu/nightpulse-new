@@ -141,8 +141,8 @@ export default function LandingPage() {
           </div>
           <div className="mb-4">
             <Link href="#" className="text-sm text-muted-foreground hover:text-accent mx-2">Contact Us</Link>
-            <Link href="#" className="text-sm text-muted-foreground hover:text-accent mx-2">Terms of Service</Link>
-            <Link href="#" className="text-sm text-muted-foreground hover:text-accent mx-2">Privacy Policy</Link>
+            <Link href="/terms" className="text-sm text-muted-foreground hover:text-accent mx-2">Terms of Service</Link>
+            <Link href="/terms" className="text-sm text-muted-foreground hover:text-accent mx-2">Privacy Policy</Link>
           </div>
           <p className="text-sm text-muted-foreground">&copy; {new Date().getFullYear()} {siteConfig.name}. All rights reserved.</p>
         </div>

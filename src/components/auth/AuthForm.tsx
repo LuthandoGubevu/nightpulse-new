@@ -5,19 +5,23 @@ import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
   GoogleAuthProvider,
   signInWithPopup,
+  getAdditionalUserInfo,
 } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
+import { recordTermsAcceptanceAction } from "@/actions/profileActions";
 import { Icons } from "@/components/icons";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Form,
   FormControl,
@@ -39,6 +43,9 @@ const signUpSchema = z
     email: z.string().email("Enter a valid email address."),
     password: z.string().min(6, "Password must be at least 6 characters."),
     confirmPassword: z.string(),
+    agreedToTerms: z.boolean().refine((v) => v === true, {
+      message: "You must agree to the Terms of Service to create an account.",
+    }),
   })
   .refine((data) => data.password === data.confirmPassword, {
     message: "Passwords do not match.",
@@ -105,7 +112,7 @@ export function AuthForm() {
 
   const signUpForm = useForm<SignUpValues>({
     resolver: zodResolver(signUpSchema),
-    defaultValues: { email: "", password: "", confirmPassword: "" },
+    defaultValues: { email: "", password: "", confirmPassword: "", agreedToTerms: false },
     mode: "onChange",
   });
 
@@ -133,7 +140,11 @@ export function AuthForm() {
     }
     setIsSubmitting(true);
     try {
-      await createUserWithEmailAndPassword(auth, values.email, values.password);
+      const credential = await createUserWithEmailAndPassword(auth, values.email, values.password);
+      const idToken = await credential.user.getIdToken();
+      recordTermsAcceptanceAction(idToken).catch((error) =>
+        console.error("Failed to record terms acceptance:", error)
+      );
       toast({ title: "Account Created", description: "Welcome to Vybi." });
       router.push(redirectTo);
     } catch (error: any) {
@@ -150,7 +161,17 @@ export function AuthForm() {
     }
     setIsGoogleSubmitting(true);
     try {
-      await signInWithPopup(auth, new GoogleAuthProvider());
+      const result = await signInWithPopup(auth, new GoogleAuthProvider());
+      // Google Sign-In doubles as sign-up for a brand-new account — record
+      // acceptance for that case too, since clicking through was their only
+      // consent gesture (they see the "By continuing..." notice below, not a
+      // checkbox — a returning user shouldn't be asked to re-tick one every login).
+      if (getAdditionalUserInfo(result)?.isNewUser) {
+        const idToken = await result.user.getIdToken();
+        recordTermsAcceptanceAction(idToken).catch((error) =>
+          console.error("Failed to record terms acceptance:", error)
+        );
+      }
       toast({ title: "Welcome", description: "Signed in with Google." });
       router.push(redirectTo);
     } catch (error: any) {
@@ -272,7 +293,36 @@ export function AuthForm() {
                     </FormItem>
                   )}
                 />
-                <Button type="submit" className="w-full" disabled={isBusy}>
+                <FormField
+                  control={signUpForm.control}
+                  name="agreedToTerms"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-row items-start space-x-2 space-y-0">
+                      <FormControl>
+                        <Checkbox checked={field.value} onCheckedChange={field.onChange} />
+                      </FormControl>
+                      <div className="space-y-1 leading-none">
+                        <FormLabel className="font-normal text-sm">
+                          I agree to the{" "}
+                          <Link
+                            href="/terms"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-accent underline"
+                          >
+                            Terms of Service
+                          </Link>
+                        </FormLabel>
+                        <FormMessage />
+                      </div>
+                    </FormItem>
+                  )}
+                />
+                <Button
+                  type="submit"
+                  className="w-full"
+                  disabled={isBusy || !signUpForm.watch("agreedToTerms")}
+                >
                   {isSubmitting ? (
                     <Icons.spinner className="mr-2 h-4 w-4 animate-spin" />
                   ) : (
@@ -302,6 +352,13 @@ export function AuthForm() {
           )}
           Sign in with Google
         </Button>
+        <p className="text-center text-xs text-muted-foreground">
+          By continuing with Google, you agree to our{" "}
+          <Link href="/terms" target="_blank" rel="noopener noreferrer" className="text-accent underline">
+            Terms of Service
+          </Link>
+          .
+        </p>
       </CardContent>
     </Card>
   );
