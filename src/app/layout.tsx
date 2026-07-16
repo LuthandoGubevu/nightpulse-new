@@ -1,6 +1,6 @@
 
 import type {Metadata, Viewport} from 'next';
-import { Inter, Space_Grotesk } from 'next/font/google';
+import { Inter, Space_Grotesk, Manrope } from 'next/font/google';
 import './globals.css';
 import { cn } from "@/lib/utils";
 import { Toaster } from "@/components/ui/toaster";
@@ -17,6 +17,13 @@ const fontInter = Inter({
 const fontSpaceGrotesk = Space_Grotesk({
   subsets: ['latin'],
   variable: '--font-space-grotesk',
+});
+
+// Used only by the landing page's redesigned hero/body copy — not the app-wide body font.
+const fontManrope = Manrope({
+  subsets: ['latin'],
+  weight: ['400', '500', '600', '700'],
+  variable: '--font-manrope',
 });
 
 export const metadata: Metadata = {
@@ -50,12 +57,14 @@ export default function RootLayout({
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
         <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
+        <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet" />
       </head>
       <body
         className={cn(
           "min-h-screen bg-background font-body antialiased",
           fontInter.variable,
-          fontSpaceGrotesk.variable
+          fontSpaceGrotesk.variable,
+          fontManrope.variable
         )}
       >
         {/* Ambient background glow: two large, softly blurred spotlights sitting behind
