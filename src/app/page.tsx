@@ -125,7 +125,7 @@ export default function LandingPage() {
             Get your venue on Vybi and attract more partygoers. It&apos;s free to list your club and gain visibility!
           </p>
           <Button size="lg" variant="secondary" className="bg-accent hover:bg-accent/90 text-accent-foreground" asChild>
-            <a href="mailto:hello@nightpulse.app?subject=List%20My%20Club%20on%20Vybi">List Your Club</a>
+            <a href="mailto:hello@vybi.co.za?subject=List%20My%20Club%20on%20Vybi">List Your Club</a>
           </Button>
         </div>
       </section>
@@ -141,8 +141,8 @@ export default function LandingPage() {
           </div>
           <div className="mb-4">
             <Link href="#" className="text-sm text-muted-foreground hover:text-accent mx-2">Contact Us</Link>
-            <Link href="#" className="text-sm text-muted-foreground hover:text-accent mx-2">Terms of Service</Link>
-            <Link href="#" className="text-sm text-muted-foreground hover:text-accent mx-2">Privacy Policy</Link>
+            <Link href="/terms" className="text-sm text-muted-foreground hover:text-accent mx-2">Terms of Service</Link>
+            <Link href="/terms" className="text-sm text-muted-foreground hover:text-accent mx-2">Privacy Policy</Link>
           </div>
           <p className="text-sm text-muted-foreground">&copy; {new Date().getFullYear()} {siteConfig.name}. All rights reserved.</p>
         </div>
