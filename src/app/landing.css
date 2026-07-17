@@ -1,0 +1,23 @@
+/* Scoped to the landing page only (src/app/page.tsx) — prefixed so these never
+   collide with anything in globals.css. */
+
+@keyframes vy-drift1 { 0%,100% { transform: translate(-10%,-8%) scale(1); } 50% { transform: translate(12%,10%) scale(1.25); } }
+@keyframes vy-drift2 { 0%,100% { transform: translate(8%,6%) scale(1.1); } 50% { transform: translate(-14%,-10%) scale(0.85); } }
+@keyframes vy-drift3 { 0%,100% { transform: translate(0,0) scale(1); } 50% { transform: translate(-8%,14%) scale(1.3); } }
+@keyframes vy-strobe { 0%,92%,100% { opacity: 0; } 94%,98% { opacity: 0.14; } }
+@keyframes vy-float { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
+@keyframes vy-glow { 0%,100% { box-shadow: 0 8px 30px rgba(168,85,247,0.45), 0 0 0 rgba(236,72,153,0); } 50% { box-shadow: 0 8px 46px rgba(236,72,153,0.6), 0 0 60px rgba(168,85,247,0.35); } }
+@keyframes vy-eq { 0% { transform: scaleY(0.18); } 100% { transform: scaleY(1); } }
+@keyframes vy-ripple { 0% { transform: scale(0.7); opacity: 0.7; } 100% { transform: scale(2.2); opacity: 0; } }
+@keyframes vy-beat { 0%,100% { transform: scale(1); } 15% { transform: scale(1.18); } 30% { transform: scale(1); } 45% { transform: scale(1.12); } }
+@keyframes vy-spark { 0% { transform: scale(0) rotate(0deg); opacity: 0; } 40% { opacity: 1; } 100% { transform: scale(1.1) rotate(120deg); opacity: 0; } }
+@keyframes vy-dash { to { stroke-dashoffset: 0; } }
+@keyframes vy-ring { to { stroke-dashoffset: 47.5; } }
+@keyframes vy-live { 0%,100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.35; transform: scale(0.7); } }
+@keyframes vy-scroll { 0% { transform: translateY(0); opacity: 0; } 30% { opacity: 1; } 100% { transform: translateY(10px); opacity: 0; } }
+@keyframes vy-shimmer { 0% { transform: translateX(-120%); } 100% { transform: translateX(220%); } }
+@keyframes vy-orbit { to { transform: rotate(360deg); } }
+
+.vy-landing a { color: #c084fc; text-decoration: none; }
+.vy-landing a:hover { color: #ec4899; }
+.vy-landing ::selection { background: rgba(168,85,247,0.35); color: #fff; }

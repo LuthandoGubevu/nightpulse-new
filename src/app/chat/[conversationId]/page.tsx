@@ -188,7 +188,7 @@ export default function ChatThreadPage() {
 
   return (
     <div className="container mx-auto py-8 px-4 max-w-2xl flex flex-col h-[calc(100vh-8rem)]">
-      <div className="flex items-center gap-3 border-b pb-4">
+      <div className="flex items-center gap-3 border-b border-white/10 pb-4">
         <Avatar className="h-10 w-10">
           {otherProfile?.photoUrl ? <AvatarImage src={otherProfile.photoUrl} alt={otherProfile.displayName} /> : null}
           <AvatarFallback>
@@ -224,7 +224,9 @@ export default function ChatThreadPage() {
               <div
                 className={cn(
                   "max-w-[75%] rounded-lg px-3 py-2 text-sm",
-                  isOwn ? "bg-primary text-primary-foreground" : "bg-muted"
+                  isOwn
+                    ? "bg-gradient-vy-purple-pink text-white"
+                    : "bg-white/5 border border-white/10"
                 )}
               >
                 {message.text}
@@ -239,11 +241,11 @@ export default function ChatThreadPage() {
       </div>
 
       {isBlockedEitherWay ? (
-        <p className="text-sm text-muted-foreground text-center border-t pt-4">
+        <p className="text-sm text-muted-foreground text-center border-t border-white/10 pt-4">
           You can no longer message in this conversation.
         </p>
       ) : (
-        <div className="flex items-center gap-2 border-t pt-4">
+        <div className="flex items-center gap-2 border-t border-white/10 bg-card/70 backdrop-blur-xl p-4 rounded-b-lg">
           <Input
             value={messageText}
             onChange={(e) => setMessageText(e.target.value)}
@@ -257,7 +259,7 @@ export default function ChatThreadPage() {
             maxLength={2000}
             disabled={isSending}
           />
-          <Button size="icon" onClick={handleSend} disabled={isSending || !messageText.trim()}>
+          <Button variant="vy" size="icon" onClick={handleSend} disabled={isSending || !messageText.trim()}>
             {isSending ? <Icons.spinner className="h-4 w-4 animate-spin" /> : <Icons.send className="h-4 w-4" />}
           </Button>
         </div>

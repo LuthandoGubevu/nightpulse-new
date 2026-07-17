@@ -92,7 +92,7 @@ export default function MatchesPage() {
           <Link
             key={conversation.id}
             href={`/chat/${conversation.id}`}
-            className="flex items-center gap-3 rounded-lg border p-3 hover:bg-accent/50 transition-colors"
+            className="flex items-center gap-3 rounded-lg border border-white/10 bg-white/5 p-3 hover:bg-white/10 transition-colors"
           >
             <Avatar className="h-12 w-12">
               {otherPhotoUrl ? <AvatarImage src={otherPhotoUrl} alt={otherName} /> : null}

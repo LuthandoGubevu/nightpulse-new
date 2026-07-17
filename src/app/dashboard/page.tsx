@@ -385,7 +385,7 @@ export default function DashboardPage() {
           </div>
         )}
 
-        <div className="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
+        <div className="flex flex-col sm:flex-row gap-2 w-full md:w-auto rounded-lg border border-white/10 bg-white/5 p-2">
           <Select value={sortBy} onValueChange={handleSortChange}>
             <SelectTrigger className="w-full">
               <SelectValue placeholder="Sort by..." />

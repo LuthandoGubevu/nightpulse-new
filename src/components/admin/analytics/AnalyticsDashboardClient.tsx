@@ -294,7 +294,7 @@ export function AnalyticsDashboardClient() {
 
       <div className={cn("grid gap-6 md:grid-cols-2", selectedClub ? "lg:grid-cols-4" : "lg:grid-cols-3")}>
         {selectedClub ? (
-          <Card>
+          <Card variant="vy-glass">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Live Count Right Now</CardTitle>
               <Icons.activity className="h-4 w-4 text-muted-foreground" />
@@ -305,7 +305,7 @@ export function AnalyticsDashboardClient() {
             </CardContent>
           </Card>
         ) : (
-          <Card>
+          <Card variant="vy-glass">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Active Clubs Now</CardTitle>
               <Icons.activity className="h-4 w-4 text-muted-foreground" />
@@ -317,7 +317,7 @@ export function AnalyticsDashboardClient() {
           </Card>
         )}
 
-        <Card>
+        <Card variant="vy-glass">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Heartbeats (Last 30 Days)</CardTitle>
             <Icons.users className="h-4 w-4 text-muted-foreground" />
@@ -337,7 +337,7 @@ export function AnalyticsDashboardClient() {
         <VisitMetricsWidget metrics={visitMetrics} loading={loadingHistorical} />
 
         {selectedClub && (
-          <Card>
+          <Card variant="vy-glass">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Safety Rating</CardTitle>
               <Icons.shieldCheck className="h-4 w-4 text-muted-foreground" />

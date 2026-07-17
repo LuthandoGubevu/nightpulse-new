@@ -32,11 +32,14 @@
 
     --radius: 1rem;
 
-    --chart-1: 220 70% 50%;
-    --chart-2: 160 60% 45%;
-    --chart-3: 30 80% 55%;
-    --chart-4: 280 65% 60%;
-    --chart-5: 340 75% 55%;
+    /* Derived from the vy-* palette (Addendum 18/Phase 4) so admin charts share
+       the same 5-hue family as the rest of the redesign — purple, pink, indigo,
+       cyan, green, in that order. */
+    --chart-1: 271 91% 65%; /* purple, ~#a855f7 */
+    --chart-2: 330 81% 60%; /* pink, ~#ec4899 */
+    --chart-3: 234 89% 74%; /* indigo, ~#818cf8 */
+    --chart-4: 189 85% 53%; /* cyan, ~#22d3ee */
+    --chart-5: 158 64% 52%; /* green, ~#34d399 */
 
     --status-green: 120 61% 60%;
     --status-yellow: 51 98% 60%;
@@ -50,6 +53,24 @@
     --sidebar-accent: 288 48% 60%;
     --sidebar-accent-foreground: 0 0% 98%;
     --sidebar-ring: 288 55% 68%;
+
+    /* Landing-page-derived accent hues (Addendum 18) — additive, do not
+       repurpose --primary/--accent/--background above. Raw hex, kept in sync
+       with the colors.vy.* entries in tailwind.config.ts, for the few spots
+       (inline SVG stroke/fill) that need a literal CSS var instead of a
+       Tailwind class. */
+    --vy-purple: #a855f7;
+    --vy-purple-dark: #7c3aed;
+    --vy-pink: #ec4899;
+    --vy-pink-light: #f472b6;
+    --vy-indigo: #818cf8;
+    --vy-indigo-dark: #4338ca;
+    --vy-cyan: #22d3ee;
+    --vy-cyan-light: #67e8f9;
+    --vy-green: #34d399;
+    /* HSL (not hex, to match every other token above) — replaces the
+       hardcoded text-amber-400 star-rating fill with a real theme token. */
+    --vy-star: 45 93% 58%;
   }
 }
 
