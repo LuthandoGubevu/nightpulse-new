@@ -16,7 +16,7 @@ interface VisitMetricsWidgetProps {
 export function VisitMetricsWidget({ metrics, loading }: VisitMetricsWidgetProps) {
   if (loading) {
     return (
-      <Card>
+      <Card variant="vy-glass">
         <CardHeader>
           <Skeleton className="h-6 w-3/4" />
           <Skeleton className="h-4 w-1/2" />
@@ -38,7 +38,7 @@ export function VisitMetricsWidget({ metrics, loading }: VisitMetricsWidgetProps
 
   if (!metrics) {
     return (
-      <Card>
+      <Card variant="vy-glass">
         <CardHeader>
           <CardTitle>Visit Summary (Last 30 Days)</CardTitle>
            <CardDescription>Average session length and visitor types.</CardDescription>

@@ -32,11 +32,14 @@
 
     --radius: 1rem;
 
-    --chart-1: 220 70% 50%;
-    --chart-2: 160 60% 45%;
-    --chart-3: 30 80% 55%;
-    --chart-4: 280 65% 60%;
-    --chart-5: 340 75% 55%;
+    /* Derived from the vy-* palette (Addendum 18/Phase 4) so admin charts share
+       the same 5-hue family as the rest of the redesign — purple, pink, indigo,
+       cyan, green, in that order. */
+    --chart-1: 271 91% 65%; /* purple, ~#a855f7 */
+    --chart-2: 330 81% 60%; /* pink, ~#ec4899 */
+    --chart-3: 234 89% 74%; /* indigo, ~#818cf8 */
+    --chart-4: 189 85% 53%; /* cyan, ~#22d3ee */
+    --chart-5: 158 64% 52%; /* green, ~#34d399 */
 
     --status-green: 120 61% 60%;
     --status-yellow: 51 98% 60%;
