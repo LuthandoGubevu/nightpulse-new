@@ -146,7 +146,7 @@ export function ProfileSetupDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[85vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Set up your Meet Me profile</DialogTitle>
+          <DialogTitle className="bg-gradient-vy-purple-pink bg-clip-text text-transparent">Set up your Meet Me profile</DialogTitle>
           <DialogDescription>
             Your name, photo, and age are shown to others who've also opted in at the venue. You'll choose what you're looking for next — and you can change that every time you check in somewhere new.
           </DialogDescription>
@@ -227,14 +227,14 @@ export function ProfileSetupDialog({
           <div className="grid grid-cols-2 gap-2">
             <Button
               type="button"
-              variant={lookingFor === "friends" ? "default" : "outline"}
+              variant={lookingFor === "friends" ? "vy" : "outline"}
               onClick={() => setLookingFor("friends")}
             >
               <Icons.usersRound className="mr-1.5 h-4 w-4" /> Friends
             </Button>
             <Button
               type="button"
-              variant={lookingFor === "love" ? "default" : "outline"}
+              variant={lookingFor === "love" ? "vy" : "outline"}
               onClick={() => setLookingFor("love")}
             >
               <Icons.heart className="mr-1.5 h-4 w-4" /> Love
@@ -243,7 +243,7 @@ export function ProfileSetupDialog({
         </div>
 
         <DialogFooter>
-          <Button onClick={handleSave} disabled={isSaving} className="w-full sm:w-auto">
+          <Button variant="vy" onClick={handleSave} disabled={isSaving} className="w-full sm:w-auto">
             {isSaving && <Icons.spinner className="mr-2 h-4 w-4 animate-spin" />}
             Save &amp; continue
           </Button>
