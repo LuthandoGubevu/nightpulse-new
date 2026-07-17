@@ -223,7 +223,7 @@ export function AuthForm() {
   const isBusy = isSubmitting || isGoogleSubmitting;
 
   return (
-    <Card className="w-full">
+    <Card variant="vy-glass" className="w-full animate-in fade-in slide-in-from-bottom-4 duration-500">
       <CardHeader>
         <CardTitle>Welcome to Vybi</CardTitle>
         <CardDescription>Sign in or create an account to continue.</CardDescription>
@@ -231,8 +231,8 @@ export function AuthForm() {
       <CardContent className="space-y-6">
         <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "signin" | "signup")}>
           <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="signin">Sign In</TabsTrigger>
-            <TabsTrigger value="signup">Sign Up</TabsTrigger>
+            <TabsTrigger value="signin" className="data-[state=active]:!bg-gradient-vy-purple-pink data-[state=active]:!text-white">Sign In</TabsTrigger>
+            <TabsTrigger value="signup" className="data-[state=active]:!bg-gradient-vy-purple-pink data-[state=active]:!text-white">Sign Up</TabsTrigger>
           </TabsList>
 
           <TabsContent value="signin" className="mt-4">
@@ -268,7 +268,7 @@ export function AuthForm() {
                     </FormItem>
                   )}
                 />
-                <Button type="submit" className="w-full" disabled={isBusy}>
+                <Button type="submit" variant="vy" className="w-full" disabled={isBusy}>
                   {isSubmitting ? (
                     <Icons.spinner className="mr-2 h-4 w-4 animate-spin" />
                   ) : (
@@ -422,6 +422,7 @@ export function AuthForm() {
                 />
                 <Button
                   type="submit"
+                  variant="vy"
                   className="w-full"
                   disabled={isBusy || !signUpForm.watch("agreedToTerms")}
                 >
