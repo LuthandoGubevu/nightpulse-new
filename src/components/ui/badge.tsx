@@ -15,6 +15,8 @@ const badgeVariants = cva(
         destructive:
           "border-transparent bg-destructive text-destructive-foreground hover:bg-destructive/80",
         outline: "text-foreground",
+        // Landing-page-derived gradient (Addendum 18) — opt-in only.
+        vy: "border-transparent bg-gradient-vy-purple-pink text-white shadow-glow-vy hover:brightness-110",
       },
     },
     defaultVariants: {

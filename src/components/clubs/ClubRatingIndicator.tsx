@@ -29,7 +29,7 @@ export function ClubRatingIndicator({ sum, count, size = "md" }: ClubRatingIndic
           ))}
         </span>
         <span
-          className="absolute inset-0 flex overflow-hidden text-amber-400"
+          className="absolute inset-0 flex overflow-hidden text-vy-star"
           style={{ width: `${fillPercent}%` }}
         >
           {[0, 1, 2, 3, 4].map((i) => (
