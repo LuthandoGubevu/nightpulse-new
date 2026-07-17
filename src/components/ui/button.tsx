@@ -19,6 +19,9 @@ const buttonVariants = cva(
           "bg-secondary/80 backdrop-blur text-secondary-foreground hover:bg-secondary",
         ghost: "hover:bg-accent/10 hover:text-accent-foreground",
         link: "text-primary underline-offset-4 hover:underline",
+        // Landing-page-derived gradient (Addendum 18) — opt-in only, "default"
+        // (gradient-primary) is unchanged and remains every existing call site's variant.
+        vy: "bg-gradient-vy-purple-pink text-white shadow-glow-vy hover:brightness-110",
       },
       size: {
         default: "h-10 px-4 py-2",

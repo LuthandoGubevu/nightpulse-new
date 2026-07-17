@@ -1,6 +1,6 @@
 
 import type {Metadata, Viewport} from 'next';
-import { Inter, Space_Grotesk, Manrope } from 'next/font/google';
+import { Space_Grotesk, Manrope } from 'next/font/google';
 import './globals.css';
 import { cn } from "@/lib/utils";
 import { Toaster } from "@/components/ui/toaster";
@@ -9,17 +9,13 @@ import AppShell from '@/components/layout/AppShell';
 import { SidebarProvider } from "@/components/ui/sidebar"; // New import
 import Script from 'next/script'; // Import Script component
 
-const fontInter = Inter({
-  subsets: ['latin'],
-  variable: '--font-inter',
-});
-
 const fontSpaceGrotesk = Space_Grotesk({
   subsets: ['latin'],
   variable: '--font-space-grotesk',
 });
 
-// Used only by the landing page's redesigned hero/body copy — not the app-wide body font.
+// App-wide body font (Addendum 18) — previously landing-page-only, now the
+// default font-body everywhere, replacing Inter.
 const fontManrope = Manrope({
   subsets: ['latin'],
   weight: ['400', '500', '600', '700'],
@@ -55,24 +51,26 @@ export default function RootLayout({
       <head>
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
         <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
         <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet" />
       </head>
       <body
         className={cn(
           "min-h-screen bg-background font-body antialiased",
-          fontInter.variable,
           fontSpaceGrotesk.variable,
           fontManrope.variable
         )}
       >
         {/* Ambient background glow: two large, softly blurred spotlights sitting behind
             every page's content — fixed and pointer-events-none so it never interferes
-            with scrolling or clicks. */}
+            with scrolling or clicks. Drawn from the landing page's 5-hue palette
+            (Addendum 18) rather than just primary/accent. */}
         <div aria-hidden className="pointer-events-none fixed inset-0 -z-10 overflow-hidden">
-          <div className="absolute -top-40 -left-40 h-[32rem] w-[32rem] rounded-full bg-primary/25 blur-[120px]" />
-          <div className="absolute top-1/3 -right-40 h-[28rem] w-[28rem] rounded-full bg-accent/20 blur-[120px]" />
+          <div className="absolute -top-40 -left-40 h-[32rem] w-[32rem] rounded-full bg-gradient-vy-purple-pink opacity-20 blur-[120px]" />
+          <div
+            className="absolute top-1/3 -right-40 h-[28rem] w-[28rem] rounded-full opacity-20 blur-[120px]"
+            style={{ background: "radial-gradient(circle, var(--vy-cyan), var(--vy-indigo) 70%, transparent)" }}
+          />
         </div>
         <SidebarProvider defaultOpen={false}> {/* Default to collapsed on desktop, mobile is handled by Sheet */}
           <AppShell>{children}</AppShell>

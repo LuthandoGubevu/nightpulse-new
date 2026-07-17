@@ -86,12 +86,12 @@ export default function AppShell({ children }: AppShellProps) {
           side="left"
           collapsible="icon"
           variant="sidebar"
-          className="border-r"
+          className="border-r border-white/10"
         >
           <SidebarHeader className="p-4">
             <Link href="/dashboard" className="flex items-center space-x-2" onClick={closeSidebarOnMobile}>
-              <Icons.logo className="h-7 w-7 text-primary" />
-              <span className="font-bold font-headline text-lg group-data-[collapsible=icon]:hidden">
+              <Icons.logo className="h-7 w-7 text-vy-purple" />
+              <span className="font-bold font-headline text-lg group-data-[collapsible=icon]:hidden bg-gradient-vy-purple-pink bg-clip-text text-transparent">
                 {siteConfig.name}
               </span>
             </Link>
@@ -112,7 +112,7 @@ export default function AppShell({ children }: AppShellProps) {
                         asChild
                         isActive={isItemActive}
                         tooltip={item.title}
-                        className="w-full justify-start"
+                        className="w-full justify-start data-[active=true]:!bg-gradient-vy-purple-pink data-[active=true]:!text-white data-[active=true]:shadow-glow-vy"
                       >
                         <Link href={item.href} onClick={closeSidebarOnMobile}>
                           {IconComponent && <IconComponent className="h-4 w-4" />}
@@ -127,7 +127,7 @@ export default function AppShell({ children }: AppShellProps) {
             </SidebarMenu>
           </SidebarContent>
 
-          <SidebarFooter className="p-2 mt-auto border-t">
+          <SidebarFooter className="p-2 mt-auto border-t border-white/10">
             <div className="flex flex-col gap-2">
               {authLoading ? (
                 <div className="flex items-center gap-2 px-2">
@@ -169,11 +169,11 @@ export default function AppShell({ children }: AppShellProps) {
         </Sidebar>
 
         <SidebarInset className="flex-1 flex flex-col">
-          <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b bg-background/95 px-4 backdrop-blur supports-[backdrop-filter]:bg-background/60 md:justify-start">
+          <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-white/10 bg-background/95 px-4 backdrop-blur supports-[backdrop-filter]:bg-background/60 md:justify-start">
             <div className="md:hidden">
               <Link href="/dashboard" className="flex items-center space-x-2">
-                  <Icons.logo className="h-6 w-6 text-primary" />
-                  <span className="font-bold font-headline text-base">{siteConfig.name}</span>
+                  <Icons.logo className="h-6 w-6 text-vy-purple" />
+                  <span className="font-bold font-headline text-base bg-gradient-vy-purple-pink bg-clip-text text-transparent">{siteConfig.name}</span>
               </Link>
             </div>
              <SidebarTrigger className="md:hidden ml-auto" />

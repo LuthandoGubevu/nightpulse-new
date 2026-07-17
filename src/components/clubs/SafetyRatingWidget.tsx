@@ -55,7 +55,7 @@ export function SafetyRatingWidget({ clubId, initialRating }: SafetyRatingWidget
             <Icons.star
               className={cn(
                 "h-5 w-5 transition-colors",
-                star <= displayRating ? "fill-current text-amber-400" : "text-muted-foreground/40"
+                star <= displayRating ? "fill-current text-vy-star" : "text-muted-foreground/40"
               )}
             />
           </button>

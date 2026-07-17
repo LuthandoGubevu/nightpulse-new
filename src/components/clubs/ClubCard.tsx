@@ -40,10 +40,15 @@ export function ClubCard({ club, isHereNow = false }: ClubCardProps) {
   };
 
   return (
-    <Card className="flex flex-col overflow-hidden hover:shadow-glow transition-shadow duration-300">
+    <Card variant="vy-glass" className="flex flex-col overflow-hidden hover:shadow-glow-vy-lg transition-shadow duration-300">
         <CardContent className="p-6 flex-grow space-y-3">
           <div className="flex justify-between items-start">
-            <CardTitle className="text-2xl font-headline mb-1">{club.name}</CardTitle>
+            <div className="flex items-center gap-3">
+              <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-lg bg-gradient-vy-purple-pink">
+                <Icons.martini className="h-4 w-4 text-white" />
+              </div>
+              <CardTitle className="text-2xl font-headline mb-1">{club.name}</CardTitle>
+            </div>
             <ClubStatusIndicator status={status} size="lg" />
           </div>
           {club.isTrending && (
@@ -105,14 +110,14 @@ export function ClubCard({ club, isHereNow = false }: ClubCardProps) {
             </div>
           )}
       </CardContent>
-      <CardFooter className="p-4 border-t flex flex-col items-stretch gap-2">
+      <CardFooter className="p-4 border-t border-white/10 flex flex-col items-stretch gap-2">
         <div className="flex items-center justify-between">
           <span className="text-sm font-medium text-muted-foreground">Safety Rating</span>
           <ClubRatingIndicator sum={club.safetyRatingSum ?? 0} count={club.safetyRatingCount ?? 0} size="sm" />
         </div>
         <SafetyRatingWidget clubId={club.id} initialRating={club.myRating ?? null} />
         {isHereNow && (
-          <div className="pt-2 border-t">
+          <div className="pt-2 border-t border-white/10">
             <MeetMeButton clubId={club.id} />
           </div>
         )}
