@@ -146,10 +146,10 @@ export default function MeetMePeoplePage() {
           return (
             <div
               key={person.id}
-              className="rounded-xl border bg-card p-4 flex flex-col gap-3 sm:flex-row sm:items-center"
+              className="rounded-xl border border-white/10 bg-gradient-vy-card p-4 flex flex-col gap-3 sm:flex-row sm:items-center"
             >
               <div className="flex items-center gap-3 flex-1 min-w-0">
-                <Avatar className="h-14 w-14 border shrink-0">
+                <Avatar className="h-14 w-14 border border-white/10 shrink-0">
                   {person.photoUrl ? <AvatarImage src={person.photoUrl} alt={person.displayName} /> : null}
                   <AvatarFallback>
                     <Icons.userRound className="h-7 w-7 text-muted-foreground" />
@@ -165,8 +165,8 @@ export default function MeetMePeoplePage() {
                       className={
                         "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium shrink-0 " +
                         (person.lookingFor === "love"
-                          ? "bg-pink-500/15 text-pink-500"
-                          : "bg-sky-500/15 text-sky-500")
+                          ? "bg-vy-pink/15 text-vy-pink"
+                          : "bg-vy-indigo/15 text-vy-indigo")
                       }
                     >
                       {person.lookingFor === "love" ? (
@@ -183,11 +183,11 @@ export default function MeetMePeoplePage() {
 
               <div className="flex items-center gap-2 justify-end shrink-0">
                 {isInterested ? (
-                  <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/15 text-emerald-500 px-3 py-1.5 text-sm font-medium whitespace-nowrap">
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-vy-green/15 text-vy-green px-3 py-1.5 text-sm font-medium whitespace-nowrap">
                     <Icons.check className="h-4 w-4" /> Interested
                   </span>
                 ) : (
-                  <Button size="sm" disabled={isPending} onClick={() => handleInterested(person.id)}>
+                  <Button variant="vy" size="sm" disabled={isPending} onClick={() => handleInterested(person.id)}>
                     {isPending ? (
                       <Icons.spinner className="mr-1.5 h-4 w-4 animate-spin" />
                     ) : (

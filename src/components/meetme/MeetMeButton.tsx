@@ -6,6 +6,7 @@ import { doc, getDoc } from "firebase/firestore";
 import { auth, firestore } from "@/lib/firebase";
 import { optInMeetMeAction, optOutMeetMeAction } from "@/actions/meetMeActions";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import { Icons } from "@/components/icons";
 import { useToast } from "@/hooks/use-toast";
 import { ProfileSetupDialog } from "./ProfileSetupDialog";
@@ -162,10 +163,12 @@ export function MeetMeButton({ clubId }: MeetMeButtonProps) {
       <div className="flex items-center gap-2">
         <Button
           size="sm"
-          variant={isOptedIn ? "secondary" : "default"}
+          variant={isOptedIn ? "secondary" : "vy"}
           disabled={isBusy}
           onClick={handleToggle}
-          className="flex-1"
+          // The glow pulse only plays while genuinely opted in and visible right
+          // now — a live status signal, not decoration.
+          className={cn("flex-1", isOptedIn && "animate-vy-glow")}
         >
           {isBusy ? (
             <Icons.spinner className="mr-2 h-4 w-4 animate-spin" />
