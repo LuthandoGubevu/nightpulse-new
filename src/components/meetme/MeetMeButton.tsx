@@ -175,7 +175,7 @@ export function MeetMeButton({ clubId }: MeetMeButtonProps) {
           ) : (
             <Icons.heart className="mr-2 h-4 w-4" />
           )}
-          {isOptedIn ? "You're visible — tap to leave" : "Meet Me"}
+          {isOptedIn ? "Tap to leave" : "Meet Me"}
         </Button>
         {isOptedIn && (
           <Button size="sm" variant="outline" className="shrink-0" onClick={goToPeoplePage}>
