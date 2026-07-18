@@ -168,7 +168,7 @@ export function MeetMeButton({ clubId }: MeetMeButtonProps) {
           onClick={handleToggle}
           // The glow pulse only plays while genuinely opted in and visible right
           // now — a live status signal, not decoration.
-          className={cn("flex-1", isOptedIn && "animate-vy-glow")}
+          className={cn("flex-1 min-w-0 truncate", isOptedIn && "animate-vy-glow")}
         >
           {isBusy ? (
             <Icons.spinner className="mr-2 h-4 w-4 animate-spin" />
@@ -178,7 +178,7 @@ export function MeetMeButton({ clubId }: MeetMeButtonProps) {
           {isOptedIn ? "You're visible — tap to leave" : "Meet Me"}
         </Button>
         {isOptedIn && (
-          <Button size="sm" variant="outline" onClick={goToPeoplePage}>
+          <Button size="sm" variant="outline" className="shrink-0" onClick={goToPeoplePage}>
             People here
           </Button>
         )}
