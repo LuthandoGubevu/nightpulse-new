@@ -20,6 +20,17 @@ service cloud.firestore {
                    && request.auth.token.email_verified == true;
     }
 
+    // Clubs' raw crowd count + per-club capacity thresholds:
+    // - Some venues open past official closing hours, so an exact headcount visible to
+    //   any signed-in user (Firestore rules can't restrict individual fields, only whole
+    //   documents) could be used as evidence against them by an authority. Reads/writes
+    //   go exclusively through clubActions.ts using the Admin SDK, same lockdown pattern
+    //   as visits/safetyRatings below. The public clubs/{clubId} doc instead carries a
+    //   derived `status` enum (low/moderate/packed/over-packed), never the raw number.
+    match /clubs/{clubId}/private/capacity {
+      allow read, write: if false;
+    }
+
     // Safety ratings subcollection (one vote doc per user per club, doc ID = uid):
     // - All reads and writes go exclusively through ratingActions.ts using the
     //   Firebase Admin SDK, which bypasses these rules entirely and atomically keeps

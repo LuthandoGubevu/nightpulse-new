@@ -8,7 +8,6 @@ import { ClubRatingIndicator } from "./ClubRatingIndicator";
 import { SafetyRatingWidget } from "./SafetyRatingWidget";
 import { MeetMeButton } from "@/components/meetme/MeetMeButton";
 import type { ClubWithId, ClubStatus } from "@/types";
-import { getClubStatus } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Timestamp } from "firebase/firestore";
 
@@ -18,7 +17,9 @@ interface ClubCardProps {
 }
 
 export function ClubCard({ club, isHereNow = false }: ClubCardProps) {
-  const status: ClubStatus = getClubStatus(club.currentCount, club.capacityThresholds);
+  // Raw headcounts are admin-only (Addendum 24) — the club's own status enum is the
+  // only capacity signal this card ever receives.
+  const status: ClubStatus = club.status ?? "unknown";
 
   const statusTextMap: Record<ClubStatus, string> = {
     low: "Not busy",
@@ -68,10 +69,8 @@ export function ClubCard({ club, isHereNow = false }: ClubCardProps) {
             </p>
           )}
 
-          <div className="flex items-baseline space-x-2">
+          <div className="flex items-center space-x-2">
             <Icons.users className="h-5 w-5 text-primary" />
-            <span className="text-lg font-semibold">{club.currentCount}</span> 
-            <span className="text-sm text-muted-foreground">people (live)</span>
             <span className="text-sm font-medium">{statusTextMap[status]}</span>
           </div>
 
