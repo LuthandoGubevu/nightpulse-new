@@ -15,27 +15,31 @@ export function ClubRatingIndicator({ sum, count, size = "md" }: ClubRatingIndic
   }
 
   const average = sum / count;
-  const fillPercent = (Math.max(0, Math.min(5, average)) / 5) * 100;
 
   return (
     <span
       className="inline-flex items-center gap-1.5"
       title={`Average safety rating: ${average.toFixed(1)} / 5 (${count} rating${count === 1 ? "" : "s"})`}
     >
-      <span className="relative inline-flex">
-        <span className="flex text-muted-foreground/30">
-          {[0, 1, 2, 3, 4].map((i) => (
-            <Icons.star key={i} className={cn(starSize[size], "fill-current")} />
-          ))}
-        </span>
-        <span
-          className="absolute inset-0 flex overflow-hidden text-vy-star"
-          style={{ width: `${fillPercent}%` }}
-        >
-          {[0, 1, 2, 3, 4].map((i) => (
-            <Icons.star key={i} className={cn(starSize[size], "fill-current")} />
-          ))}
-        </span>
+      <span className="inline-flex">
+        {/* Each star clips its OWN gold overlay to that star's fill fraction, rather than
+            clipping one gold overlay across the whole 5-star row by a row-wide percentage
+            — the row-wide version rendered as extra stray stars instead of a clean
+            partial fill. */}
+        {[0, 1, 2, 3, 4].map((i) => {
+          const starFillPercent = Math.max(0, Math.min(1, average - i)) * 100;
+          return (
+            <span key={i} className="relative inline-flex">
+              <Icons.star className={cn(starSize[size], "fill-current text-muted-foreground/30")} />
+              <span
+                className="absolute inset-0 overflow-hidden text-vy-star"
+                style={{ width: `${starFillPercent}%` }}
+              >
+                <Icons.star className={cn(starSize[size], "fill-current")} />
+              </span>
+            </span>
+          );
+        })}
       </span>
       <span className="text-xs text-muted-foreground">
         {average.toFixed(1)} ({count})
