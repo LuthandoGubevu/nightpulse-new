@@ -23,6 +23,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { StoryRing } from "@/components/stories/StoryRing";
 import { StoryComposerDialog } from "@/components/stories/StoryComposerDialog";
 import { StoryViewer } from "@/components/stories/StoryViewer";
+import { useToast } from "@/hooks/use-toast";
 import type { ConversationWithId, StoryWithId } from "@/types";
 
 interface MatchRow {
@@ -44,6 +45,7 @@ function isActive(story: StoryWithId, now: Timestamp): boolean {
 
 export default function MatchesPage() {
   const { user } = useAuth();
+  const { toast } = useToast();
   const [rows, setRows] = useState<MatchRow[]>([]);
   const [loading, setLoading] = useState(true);
   const profileCacheRef = useRef<Map<string, { displayName: string; photoUrl: string | null }>>(new Map());
@@ -115,16 +117,23 @@ export default function MatchesPage() {
     })();
 
     const q = query(collection(firestore, "users", user.uid, "stories"), orderBy("createdAt", "asc"));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const now = Timestamp.now();
-      setOwnStories(
-        snapshot.docs
-          .map((d) => ({ id: d.id, ...(d.data() as any) }) as StoryWithId)
-          .filter((s) => isActive(s, now))
-      );
-    });
+    const unsubscribe = onSnapshot(
+      q,
+      (snapshot) => {
+        const now = Timestamp.now();
+        setOwnStories(
+          snapshot.docs
+            .map((d) => ({ id: d.id, ...(d.data() as any) }) as StoryWithId)
+            .filter((s) => isActive(s, now))
+        );
+      },
+      (error) => {
+        console.error("Error fetching your stories:", error);
+        toast({ title: "Couldn't load your story", description: error.message, variant: "destructive" });
+      }
+    );
     return () => unsubscribe();
-  }, [user]);
+  }, [user, toast]);
 
   const matchedUidsKey = useMemo(() => rows.map((r) => r.otherUid).sort().join(","), [rows]);
 
@@ -142,23 +151,38 @@ export default function MatchesPage() {
     const chunks = chunk(matchedUids, 30);
     const unsubscribes = chunks.map((uidsChunk) => {
       const q = query(collectionGroup(db, "stories"), where("authorUid", "in", uidsChunk));
-      return onSnapshot(q, (snapshot) => {
-        const now = Timestamp.now();
-        const chunkResult: Record<string, StoryWithId[]> = {};
-        uidsChunk.forEach((uid) => {
-          chunkResult[uid] = [];
-        });
-        snapshot.docs.forEach((d) => {
-          const story = { id: d.id, ...(d.data() as any) } as StoryWithId;
-          if (!isActive(story, now)) return;
-          chunkResult[story.authorUid] = chunkResult[story.authorUid] ? [...chunkResult[story.authorUid], story] : [story];
-        });
-        setStoriesByAuthor((prev) => ({ ...prev, ...chunkResult }));
-      });
+      return onSnapshot(
+        q,
+        (snapshot) => {
+          const now = Timestamp.now();
+          const chunkResult: Record<string, StoryWithId[]> = {};
+          uidsChunk.forEach((uid) => {
+            chunkResult[uid] = [];
+          });
+          snapshot.docs.forEach((d) => {
+            const story = { id: d.id, ...(d.data() as any) } as StoryWithId;
+            if (!isActive(story, now)) return;
+            chunkResult[story.authorUid] = chunkResult[story.authorUid] ? [...chunkResult[story.authorUid], story] : [story];
+          });
+          setStoriesByAuthor((prev) => ({ ...prev, ...chunkResult }));
+        },
+        (error) => {
+          // Most likely cause: a collectionGroup("stories") query with a filter needs a
+          // Firestore index explicitly scoped to "Collection group" — Firestore doesn't
+          // auto-create one the way it does for a plain (non-group) query. When that's
+          // the cause, error.message includes a direct "create this index" console link.
+          console.error("Error fetching matches' stories:", error);
+          toast({
+            title: "Couldn't load matches' stories",
+            description: error.message,
+            variant: "destructive",
+          });
+        }
+      );
     });
 
     return () => unsubscribes.forEach((u) => u());
-  }, [matchedUidsKey]);
+  }, [matchedUidsKey, toast]);
 
   const matchesWithActiveStories = rows.filter((row) => (storiesByAuthor[row.otherUid]?.length ?? 0) > 0);
 
