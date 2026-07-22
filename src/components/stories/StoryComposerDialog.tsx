@@ -25,6 +25,28 @@ interface StoryComposerDialogProps {
   onPosted: () => void;
 }
 
+const MAX_UPLOAD_BYTES = 5 * 1024 * 1024; // must stay in sync with storage.rules' storyMedia cap
+
+// Phone-camera photos routinely run 5-15MB, well past storage.rules' cap — which the
+// Storage SDK tends to report as an opaque "storage/unknown" rather than a clear
+// too-large error. Downscaling client-side avoids hitting that limit in the first
+// place, rather than just producing a clearer error after the fact.
+async function compressImageForUpload(file: File, maxDimension = 1600, quality = 0.82): Promise<Blob> {
+  const bitmap = await createImageBitmap(file);
+  const scale = Math.min(1, maxDimension / Math.max(bitmap.width, bitmap.height));
+  const width = Math.round(bitmap.width * scale);
+  const height = Math.round(bitmap.height * scale);
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) throw new Error("Could not process image.");
+  ctx.drawImage(bitmap, 0, 0, width, height);
+  const blob: Blob | null = await new Promise((resolve) => canvas.toBlob(resolve, "image/jpeg", quality));
+  if (!blob) throw new Error("Could not process image.");
+  return blob;
+}
+
 const PRESET_COLORS = [
   "#7c3aed", // purple
   "#db2777", // pink
@@ -88,9 +110,26 @@ export function StoryComposerDialog({ open, onOpenChange, onPosted }: StoryCompo
       let result;
       if (mode === "image") {
         if (!storage) throw new Error("Storage is not available.");
+
+        let uploadBlob: Blob = photoFile!;
+        try {
+          uploadBlob = await compressImageForUpload(photoFile!);
+        } catch {
+          // Fall back to the original file if compression fails for any reason
+          // (unsupported format, etc.) — the size check below still guards it.
+        }
+        if (uploadBlob.size > MAX_UPLOAD_BYTES) {
+          toast({
+            title: "Photo too large",
+            description: "Please choose a smaller photo (under 5MB) and try again.",
+            variant: "destructive",
+          });
+          return;
+        }
+
         const path = `storyMedia/${uid}/${crypto.randomUUID()}.jpg`;
         const fileRef = storageRef(storage, path);
-        await uploadBytes(fileRef, photoFile!, { contentType: photoFile!.type });
+        await uploadBytes(fileRef, uploadBlob, { contentType: "image/jpeg" });
         result = await postStoryAction(idToken, {
           mediaType: "image",
           mediaPath: fileRef.fullPath,
@@ -104,8 +143,12 @@ export function StoryComposerDialog({ open, onOpenChange, onPosted }: StoryCompo
         });
       }
 
-      if (!result.success) {
-        toast({ title: "Couldn't post", description: result.error || "An unexpected error occurred.", variant: "destructive" });
+      if (!result?.success) {
+        toast({
+          title: "Couldn't post",
+          description: result?.error || "Something went wrong — please try again.",
+          variant: "destructive",
+        });
         return;
       }
 
