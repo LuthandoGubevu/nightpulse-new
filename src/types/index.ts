@@ -149,3 +149,23 @@ export interface Report {
   createdAt: Timestamp;
   status: "open";
 }
+
+// users/{uid}/stories/{storyId} — ephemeral posts (photo or text-only "status"),
+// visible only to the author and their Meet Me matches (see firestore.rules). Written
+// exclusively via storyActions.ts (Admin SDK); expiresAt is enforced both by the
+// Firestore read rule and by client-side filtering, mirroring MeetMePresence.
+export type StoryMediaType = "image" | "text";
+
+export interface Story {
+  authorUid: string;
+  mediaPath: string | null; // Storage object path (never a resolved download URL)
+  mediaType: StoryMediaType;
+  text: string | null; // caption for a photo story, or the full status text
+  backgroundColor: string | null; // preset color for a text-only status
+  createdAt: Timestamp;
+  expiresAt: Timestamp;
+}
+
+export interface StoryWithId extends Story {
+  id: string;
+}
