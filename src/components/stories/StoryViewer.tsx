@@ -2,12 +2,11 @@
 
 import { useEffect, useRef, useState } from "react";
 import { auth } from "@/lib/firebase";
-import { getStoryMediaUrlAction, deleteStoryAction } from "@/actions/storyActions";
+import { getStoryMediaUrlAction, deleteStoryAction, type SerializedStory } from "@/actions/storyActions";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Icons } from "@/components/icons";
 import { useToast } from "@/hooks/use-toast";
-import type { StoryWithId } from "@/types";
 
 const STORY_DURATION_MS = 5000;
 const TICK_MS = 50;
@@ -18,7 +17,7 @@ interface StoryViewerProps {
   authorUid: string;
   authorName: string;
   authorPhotoUrl: string | null;
-  stories: StoryWithId[];
+  stories: SerializedStory[];
   initialIndex?: number;
   isOwnStory?: boolean;
   onDeleted?: (storyId: string) => void;

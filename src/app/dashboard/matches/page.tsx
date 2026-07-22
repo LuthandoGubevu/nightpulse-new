@@ -1,20 +1,10 @@
 
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import {
-  collection,
-  collectionGroup,
-  doc,
-  getDoc,
-  onSnapshot,
-  orderBy,
-  query,
-  Timestamp,
-  where,
-} from "firebase/firestore";
-import { firestore } from "@/lib/firebase";
+import { collection, doc, getDoc, onSnapshot, orderBy, query, where } from "firebase/firestore";
+import { auth, firestore } from "@/lib/firebase";
 import { useAuth } from "@/hooks/useAuth";
 import { PageHeader } from "@/components/common/PageHeader";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -23,24 +13,15 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { StoryRing } from "@/components/stories/StoryRing";
 import { StoryComposerDialog } from "@/components/stories/StoryComposerDialog";
 import { StoryViewer } from "@/components/stories/StoryViewer";
+import { getOwnActiveStoriesAction, getMatchesActiveStoriesAction, type SerializedStory } from "@/actions/storyActions";
 import { useToast } from "@/hooks/use-toast";
-import type { ConversationWithId, StoryWithId } from "@/types";
+import type { ConversationWithId } from "@/types";
 
 interface MatchRow {
   conversation: ConversationWithId;
   otherUid: string;
   otherName: string;
   otherPhotoUrl: string | null;
-}
-
-function chunk<T>(arr: T[], size: number): T[][] {
-  const out: T[][] = [];
-  for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size));
-  return out;
-}
-
-function isActive(story: StoryWithId, now: Timestamp): boolean {
-  return (story.expiresAt as unknown as Timestamp).toMillis() > now.toMillis();
 }
 
 export default function MatchesPage() {
@@ -51,14 +32,14 @@ export default function MatchesPage() {
   const profileCacheRef = useRef<Map<string, { displayName: string; photoUrl: string | null }>>(new Map());
 
   const [ownProfile, setOwnProfile] = useState<{ displayName: string; photoUrl: string | null } | null>(null);
-  const [ownStories, setOwnStories] = useState<StoryWithId[]>([]);
-  const [storiesByAuthor, setStoriesByAuthor] = useState<Record<string, StoryWithId[]>>({});
+  const [ownStories, setOwnStories] = useState<SerializedStory[]>([]);
+  const [storiesByAuthor, setStoriesByAuthor] = useState<Record<string, SerializedStory[]>>({});
   const [composerOpen, setComposerOpen] = useState(false);
   const [viewer, setViewer] = useState<{
     authorUid: string;
     authorName: string;
     authorPhotoUrl: string | null;
-    stories: StoryWithId[];
+    stories: SerializedStory[];
     isOwn: boolean;
   } | null>(null);
 
@@ -107,6 +88,39 @@ export default function MatchesPage() {
     return () => unsubscribe();
   }, [user]);
 
+  // Stories go through Server Actions (Admin SDK), not direct client Firestore reads —
+  // "is the requester matched with this story's author" can't be expressed as a
+  // provable Firestore rule for a list/collectionGroup query (see Addendum 28). That
+  // trades live push updates for fetch-on-mount + refetch-after-mutation, same posture
+  // already accepted for the admin club list.
+  const fetchOwnStories = useCallback(async () => {
+    const idToken = await auth?.currentUser?.getIdToken();
+    if (!idToken) {
+      setOwnStories([]);
+      return;
+    }
+    try {
+      setOwnStories(await getOwnActiveStoriesAction(idToken));
+    } catch (error: any) {
+      console.error("Error fetching your stories:", error);
+      toast({ title: "Couldn't load your story", description: error.message, variant: "destructive" });
+    }
+  }, [toast]);
+
+  const fetchMatchesStories = useCallback(async () => {
+    const idToken = await auth?.currentUser?.getIdToken();
+    if (!idToken) {
+      setStoriesByAuthor({});
+      return;
+    }
+    try {
+      setStoriesByAuthor(await getMatchesActiveStoriesAction(idToken));
+    } catch (error: any) {
+      console.error("Error fetching matches' stories:", error);
+      toast({ title: "Couldn't load matches' stories", description: error.message, variant: "destructive" });
+    }
+  }, [toast]);
+
   // Own profile + own active stories, for the leading "Add to your story" ring.
   useEffect(() => {
     if (!user || !firestore) return;
@@ -115,74 +129,20 @@ export default function MatchesPage() {
       const data = snap.data();
       setOwnProfile({ displayName: data?.displayName ?? "You", photoUrl: data?.photoUrl ?? null });
     })();
-
-    const q = query(collection(firestore, "users", user.uid, "stories"), orderBy("createdAt", "asc"));
-    const unsubscribe = onSnapshot(
-      q,
-      (snapshot) => {
-        const now = Timestamp.now();
-        setOwnStories(
-          snapshot.docs
-            .map((d) => ({ id: d.id, ...(d.data() as any) }) as StoryWithId)
-            .filter((s) => isActive(s, now))
-        );
-      },
-      (error) => {
-        console.error("Error fetching your stories:", error);
-        toast({ title: "Couldn't load your story", description: error.message, variant: "destructive" });
-      }
-    );
-    return () => unsubscribe();
-  }, [user, toast]);
+    fetchOwnStories();
+  }, [user, fetchOwnStories]);
 
   const matchedUidsKey = useMemo(() => rows.map((r) => r.otherUid).sort().join(","), [rows]);
 
-  // One collectionGroup("stories") listener per 30-uid chunk, instead of a listener per
-  // match — the {path=**}/stories firestore.rules block is what makes a batched
-  // cross-author query like this possible.
+  // getMatchesActiveStoriesAction derives the matched-uid set itself server-side; the
+  // client only uses matchedUidsKey as a "something changed, refetch" trigger.
   useEffect(() => {
-    const matchedUids = matchedUidsKey ? matchedUidsKey.split(",") : [];
-    const db = firestore;
-    if (!db || matchedUids.length === 0) {
+    if (!user) {
       setStoriesByAuthor({});
       return;
     }
-
-    const chunks = chunk(matchedUids, 30);
-    const unsubscribes = chunks.map((uidsChunk) => {
-      const q = query(collectionGroup(db, "stories"), where("authorUid", "in", uidsChunk));
-      return onSnapshot(
-        q,
-        (snapshot) => {
-          const now = Timestamp.now();
-          const chunkResult: Record<string, StoryWithId[]> = {};
-          uidsChunk.forEach((uid) => {
-            chunkResult[uid] = [];
-          });
-          snapshot.docs.forEach((d) => {
-            const story = { id: d.id, ...(d.data() as any) } as StoryWithId;
-            if (!isActive(story, now)) return;
-            chunkResult[story.authorUid] = chunkResult[story.authorUid] ? [...chunkResult[story.authorUid], story] : [story];
-          });
-          setStoriesByAuthor((prev) => ({ ...prev, ...chunkResult }));
-        },
-        (error) => {
-          // Most likely cause: a collectionGroup("stories") query with a filter needs a
-          // Firestore index explicitly scoped to "Collection group" — Firestore doesn't
-          // auto-create one the way it does for a plain (non-group) query. When that's
-          // the cause, error.message includes a direct "create this index" console link.
-          console.error("Error fetching matches' stories:", error);
-          toast({
-            title: "Couldn't load matches' stories",
-            description: error.message,
-            variant: "destructive",
-          });
-        }
-      );
-    });
-
-    return () => unsubscribes.forEach((u) => u());
-  }, [matchedUidsKey, toast]);
+    fetchMatchesStories();
+  }, [user, matchedUidsKey, fetchMatchesStories]);
 
   const matchesWithActiveStories = rows.filter((row) => (storiesByAuthor[row.otherUid]?.length ?? 0) > 0);
 
@@ -277,8 +237,7 @@ export default function MatchesPage() {
         open={composerOpen}
         onOpenChange={setComposerOpen}
         onPosted={() => {
-          // The users/{uid}/stories onSnapshot listener above picks up the new story on
-          // its own; nothing else to refresh.
+          fetchOwnStories();
         }}
       />
 
@@ -291,7 +250,10 @@ export default function MatchesPage() {
           authorPhotoUrl={viewer.authorPhotoUrl}
           stories={viewer.stories}
           isOwnStory={viewer.isOwn}
-          onDeleted={() => setViewer(null)}
+          onDeleted={() => {
+            setViewer(null);
+            fetchOwnStories();
+          }}
         />
       )}
     </div>
