@@ -6,11 +6,14 @@ interface ClubStatusIndicatorProps {
   size?: "sm" | "md" | "lg";
 }
 
+// Inverted from a typical safety traffic-light: for this app a full, high-energy club
+// is the desirable outcome, not a dangerous one, so red marks a quiet club and green
+// marks a packed one (Addendum 24).
 const statusColors: Record<ClubStatus, string> = {
-  low: "bg-status-green",
+  low: "bg-status-red",
   moderate: "bg-status-yellow",
   packed: "bg-status-orange",
-  "over-packed": "bg-status-red",
+  "over-packed": "bg-status-green",
   unknown: "bg-muted",
 };
 
