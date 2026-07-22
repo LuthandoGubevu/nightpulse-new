@@ -2,7 +2,7 @@
 "use server";
 
 import { adminFirestore, adminStorageBucket } from "@/lib/firebaseAdmin";
-import { Timestamp } from "firebase-admin/firestore";
+import { Timestamp, type QueryDocumentSnapshot } from "firebase-admin/firestore";
 import { verifyUserIdToken } from "@/lib/serverAuth";
 import { z } from "zod";
 
@@ -30,6 +30,44 @@ const PostStoryInputSchema = z.discriminatedUnion("mediaType", [
 ]);
 
 type PostStoryInput = z.infer<typeof PostStoryInputSchema>;
+
+// Plain, serializable shape for reads (Admin SDK Timestamps don't round-trip through a
+// Server Action response the way client SDK Timestamps do in this app's direct-listener
+// code elsewhere, so expiresAt/createdAt come back as millis).
+export interface SerializedStory {
+  id: string;
+  authorUid: string;
+  mediaPath: string | null;
+  mediaType: "image" | "text";
+  text: string | null;
+  backgroundColor: string | null;
+  createdAtMillis: number;
+  expiresAtMillis: number;
+}
+
+function toSerializedStory(doc: QueryDocumentSnapshot): SerializedStory {
+  const data = doc.data();
+  return {
+    id: doc.id,
+    authorUid: data.authorUid,
+    mediaPath: data.mediaPath ?? null,
+    mediaType: data.mediaType,
+    text: data.text ?? null,
+    backgroundColor: data.backgroundColor ?? null,
+    createdAtMillis: (data.createdAt as Timestamp).toMillis(),
+    expiresAtMillis: (data.expiresAt as Timestamp).toMillis(),
+  };
+}
+
+async function fetchActiveStories(uid: string): Promise<SerializedStory[]> {
+  if (!adminFirestore) return [];
+  const now = Date.now();
+  const snap = await adminFirestore.collection("users").doc(uid).collection("stories").get();
+  return snap.docs
+    .map(toSerializedStory)
+    .filter((s) => s.expiresAtMillis > now)
+    .sort((a, b) => a.createdAtMillis - b.createdAtMillis);
+}
 
 /**
  * Posts a story (photo already uploaded to Storage by the client, or a text-only
@@ -156,4 +194,74 @@ export async function getStoryMediaUrlAction(
     console.error("Error getting story media URL:", error);
     return { success: false, error: error.message || "Failed to load photo." };
   }
+}
+
+/** The caller's own active stories — for the leading "Your story" ring. */
+export async function getOwnActiveStoriesAction(idToken: string): Promise<SerializedStory[]> {
+  const authCheck = await verifyUserIdToken(idToken);
+  if (!authCheck.ok || !adminFirestore) return [];
+  return fetchActiveStories(authCheck.uid);
+}
+
+/**
+ * Active stories from everyone the caller is matched with, keyed by author uid —
+ * derives the matched-uid set itself (via `conversations`) rather than trusting a
+ * client-supplied list, so this is also the sole source of truth for "who am I matched
+ * with" server-side. Only matches with at least one active story are included, since
+ * that's all the ring bar renders.
+ */
+export async function getMatchesActiveStoriesAction(idToken: string): Promise<Record<string, SerializedStory[]>> {
+  const authCheck = await verifyUserIdToken(idToken);
+  if (!authCheck.ok || !adminFirestore) return {};
+
+  const convSnap = await adminFirestore
+    .collection("conversations")
+    .where("participantUids", "array-contains", authCheck.uid)
+    .get();
+
+  const matchedUids = Array.from(
+    new Set(
+      convSnap.docs
+        .map((d) => {
+          const participants: string[] = d.data().participantUids ?? [];
+          return participants.find((uid) => uid !== authCheck.uid) ?? null;
+        })
+        .filter((uid): uid is string => !!uid)
+    )
+  );
+
+  const result: Record<string, SerializedStory[]> = {};
+  await Promise.all(
+    matchedUids.map(async (uid) => {
+      const stories = await fetchActiveStories(uid);
+      if (stories.length > 0) result[uid] = stories;
+    })
+  );
+  return result;
+}
+
+/**
+ * A specific user's active stories, for the match-profile page. Verifies the caller is
+ * either that user or matched with them (same conversation-existence check as
+ * getStoryMediaUrlAction) before returning anything.
+ */
+export async function getUserStoriesAction(
+  idToken: string,
+  targetUid: string
+): Promise<{ success: boolean; stories: SerializedStory[]; error?: string }> {
+  const authCheck = await verifyUserIdToken(idToken);
+  if (!authCheck.ok) return { success: false, stories: [], error: authCheck.error };
+  if (!adminFirestore) return { success: false, stories: [], error: "Server Firestore (Admin) not initialized" };
+
+  if (authCheck.uid !== targetUid) {
+    const conversationSnap = await adminFirestore
+      .collection("conversations")
+      .doc(conversationIdFor(authCheck.uid, targetUid))
+      .get();
+    if (!conversationSnap.exists) {
+      return { success: false, stories: [], error: "Not authorized to view these stories." };
+    }
+  }
+
+  return { success: true, stories: await fetchActiveStories(targetUid) };
 }

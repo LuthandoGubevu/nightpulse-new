@@ -2,12 +2,11 @@
 
 import { useEffect, useRef, useState } from "react";
 import { auth } from "@/lib/firebase";
-import { getStoryMediaUrlAction, deleteStoryAction } from "@/actions/storyActions";
+import { getStoryMediaUrlAction, deleteStoryAction, type SerializedStory } from "@/actions/storyActions";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Icons } from "@/components/icons";
 import { useToast } from "@/hooks/use-toast";
-import type { StoryWithId } from "@/types";
 
 const STORY_DURATION_MS = 5000;
 const TICK_MS = 50;
@@ -18,7 +17,7 @@ interface StoryViewerProps {
   authorUid: string;
   authorName: string;
   authorPhotoUrl: string | null;
-  stories: StoryWithId[];
+  stories: SerializedStory[];
   initialIndex?: number;
   isOwnStory?: boolean;
   onDeleted?: (storyId: string) => void;
@@ -74,17 +73,28 @@ export function StoryViewer({
     setLoadingMedia(true);
     setMediaUrl(null);
     (async () => {
-      const idToken = await auth?.currentUser?.getIdToken();
-      if (!idToken) return;
-      const result = await getStoryMediaUrlAction(idToken, authorUid, current.id);
-      if (cancelled) return;
-      if (result.success && result.url) {
-        mediaCacheRef.current.set(current.id, result.url);
-        setMediaUrl(result.url);
-      } else {
-        toast({ title: "Couldn't load photo", description: result.error, variant: "destructive" });
+      try {
+        const idToken = await auth?.currentUser?.getIdToken();
+        if (!idToken) return;
+        const result = await getStoryMediaUrlAction(idToken, authorUid, current.id);
+        if (cancelled) return;
+        if (result?.success && result.url) {
+          mediaCacheRef.current.set(current.id, result.url);
+          setMediaUrl(result.url);
+        } else {
+          toast({
+            title: "Couldn't load photo",
+            description: result?.error || "Something went wrong — please try again.",
+            variant: "destructive",
+          });
+        }
+      } catch (error: any) {
+        if (!cancelled) {
+          toast({ title: "Couldn't load photo", description: error.message, variant: "destructive" });
+        }
+      } finally {
+        if (!cancelled) setLoadingMedia(false);
       }
-      setLoadingMedia(false);
     })();
     return () => {
       cancelled = true;
@@ -131,17 +141,26 @@ export function StoryViewer({
     const idToken = await auth?.currentUser?.getIdToken();
     if (!idToken) return;
     setIsDeleting(true);
-    const result = await deleteStoryAction(idToken, current.id);
-    setIsDeleting(false);
-    if (result.success) {
-      onDeleted?.(current.id);
-      if (stories.length <= 1) {
-        onOpenChange(false);
+    try {
+      const result = await deleteStoryAction(idToken, current.id);
+      if (result?.success) {
+        onDeleted?.(current.id);
+        if (stories.length <= 1) {
+          onOpenChange(false);
+        } else {
+          goNext();
+        }
       } else {
-        goNext();
+        toast({
+          title: "Couldn't delete",
+          description: result?.error || "Something went wrong — please try again.",
+          variant: "destructive",
+        });
       }
-    } else {
-      toast({ title: "Couldn't delete", description: result.error, variant: "destructive" });
+    } catch (error: any) {
+      toast({ title: "Couldn't delete", description: error.message, variant: "destructive" });
+    } finally {
+      setIsDeleting(false);
     }
   };
 

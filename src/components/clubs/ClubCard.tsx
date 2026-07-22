@@ -114,7 +114,7 @@ export function ClubCard({ club, isHereNow = false }: ClubCardProps) {
           <span className="text-sm font-medium text-muted-foreground">Safety Rating</span>
           <ClubRatingIndicator sum={club.safetyRatingSum ?? 0} count={club.safetyRatingCount ?? 0} size="sm" />
         </div>
-        <SafetyRatingWidget clubId={club.id} initialRating={club.myRating ?? null} />
+        <SafetyRatingWidget clubId={club.id} initialRating={club.myRating ?? null} size="sm" />
         {isHereNow && (
           <div className="pt-2 border-t border-white/10">
             <MeetMeButton clubId={club.id} />

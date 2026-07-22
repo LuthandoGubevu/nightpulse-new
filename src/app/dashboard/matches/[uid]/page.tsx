@@ -4,14 +4,16 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { collection, doc, getDoc, onSnapshot, orderBy, query, Timestamp } from "firebase/firestore";
-import { firestore } from "@/lib/firebase";
+import { doc, getDoc, onSnapshot } from "firebase/firestore";
+import { auth, firestore } from "@/lib/firebase";
 import { useAuth } from "@/hooks/useAuth";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Icons } from "@/components/icons";
+import { useToast } from "@/hooks/use-toast";
 import { StoryViewer } from "@/components/stories/StoryViewer";
-import type { Gender, LookingFor, StoryWithId } from "@/types";
+import { getUserStoriesAction, type SerializedStory } from "@/actions/storyActions";
+import type { Gender, LookingFor } from "@/types";
 
 type LoadState = "loading" | "ready" | "denied";
 
@@ -32,11 +34,12 @@ export default function MatchProfilePage() {
   const { uid: otherUid } = useParams<{ uid: string }>();
   const router = useRouter();
   const { user } = useAuth();
+  const { toast } = useToast();
 
   const [loadState, setLoadState] = useState<LoadState>("loading");
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [profile, setProfile] = useState<OtherProfile | null>(null);
-  const [stories, setStories] = useState<StoryWithId[]>([]);
+  const [stories, setStories] = useState<SerializedStory[]>([]);
   const [viewerOpen, setViewerOpen] = useState(false);
 
   // Same access guard as the chat thread page: a match is exactly a
@@ -77,22 +80,28 @@ export default function MatchProfilePage() {
   }, [loadState, otherUid]);
 
   useEffect(() => {
-    if (loadState !== "ready" || !firestore || !otherUid) return;
-    // Single orderBy (no composite index needed, unlike pairing an inequality filter
-    // with a second sort field) + client-side expiresAt filtering — the same posture as
-    // the existing MeetMePresence precedent. Real enforcement still happens in
-    // firestore.rules regardless of what this query asks for.
-    const q = query(collection(firestore, "users", otherUid, "stories"), orderBy("createdAt", "asc"));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const now = Timestamp.now();
-      setStories(
-        snapshot.docs
-          .map((d) => ({ id: d.id, ...(d.data() as any) }) as StoryWithId)
-          .filter((s) => (s.expiresAt as unknown as Timestamp).toMillis() > now.toMillis())
-      );
-    });
-    return () => unsubscribe();
-  }, [loadState, otherUid]);
+    if (loadState !== "ready" || !otherUid) return;
+    // Goes through a Server Action (Admin SDK), not a direct client Firestore read — see
+    // Addendum 28: "is the requester matched with this author" can't be expressed as a
+    // provable Firestore rule for a list query, so this re-verifies the match server-side
+    // instead (redundant with the page's own conversation-existence guard above, but the
+    // action doesn't trust the client's loadState either).
+    let cancelled = false;
+    (async () => {
+      const idToken = await auth?.currentUser?.getIdToken();
+      if (!idToken) return;
+      const result = await getUserStoriesAction(idToken, otherUid);
+      if (cancelled) return;
+      if (result.success) {
+        setStories(result.stories);
+      } else {
+        toast({ title: "Couldn't load their story", description: result.error, variant: "destructive" });
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [loadState, otherUid, toast]);
 
   if (loadState === "loading") {
     return (
