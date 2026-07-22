@@ -10,9 +10,12 @@ import { useToast } from "@/hooks/use-toast";
 interface SafetyRatingWidgetProps {
   clubId: string;
   initialRating: number | null;
+  size?: "sm" | "md" | "lg";
 }
 
-export function SafetyRatingWidget({ clubId, initialRating }: SafetyRatingWidgetProps) {
+const starSize = { sm: "h-3.5 w-3.5", md: "h-4 w-4", lg: "h-5 w-5" };
+
+export function SafetyRatingWidget({ clubId, initialRating, size = "lg" }: SafetyRatingWidgetProps) {
   const [selectedRating, setSelectedRating] = useState<number | null>(initialRating);
   const [hoveredRating, setHoveredRating] = useState<number | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -54,7 +57,8 @@ export function SafetyRatingWidget({ clubId, initialRating }: SafetyRatingWidget
           >
             <Icons.star
               className={cn(
-                "h-5 w-5 transition-colors",
+                starSize[size],
+                "transition-colors",
                 star <= displayRating ? "fill-current text-vy-star" : "text-muted-foreground/40"
               )}
             />
