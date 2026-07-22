@@ -2,6 +2,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import {
   addDoc,
@@ -189,13 +190,15 @@ export default function ChatThreadPage() {
   return (
     <div className="container mx-auto py-8 px-4 max-w-2xl flex flex-col h-[calc(100vh-8rem)]">
       <div className="flex items-center gap-3 border-b border-white/10 pb-4">
-        <Avatar className="h-10 w-10">
-          {otherProfile?.photoUrl ? <AvatarImage src={otherProfile.photoUrl} alt={otherProfile.displayName} /> : null}
-          <AvatarFallback>
-            <Icons.userRound className="h-5 w-5 text-muted-foreground" />
-          </AvatarFallback>
-        </Avatar>
-        <span className="flex-1 font-semibold">{otherProfile?.displayName ?? "Someone"}</span>
+        <Link href={otherUid ? `/dashboard/matches/${otherUid}` : "#"} className="flex flex-1 items-center gap-3 min-w-0">
+          <Avatar className="h-10 w-10">
+            {otherProfile?.photoUrl ? <AvatarImage src={otherProfile.photoUrl} alt={otherProfile.displayName} /> : null}
+            <AvatarFallback>
+              <Icons.userRound className="h-5 w-5 text-muted-foreground" />
+            </AvatarFallback>
+          </Avatar>
+          <span className="font-semibold truncate">{otherProfile?.displayName ?? "Someone"}</span>
+        </Link>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button size="icon" variant="ghost" aria-label="Conversation options">
