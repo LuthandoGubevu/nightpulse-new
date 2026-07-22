@@ -140,6 +140,33 @@ service cloud.firestore {
       allow update, delete: if false;
     }
 
+    // Stories/status updates — ephemeral posts (photo or text-only), visible only to
+    // the author and their Meet Me matches. A single wildcard block so the SAME rule
+    // covers both a direct users/{uid}/stories read and a collectionGroup("stories")
+    // query (the matches page batches "who has an active story" across many authors at
+    // once). Reuses the deterministic conversationId scheme from expressInterestAction
+    // (sorted uid pair) instead of a denormalized matched-uids list — assumes JS's
+    // default Array.sort() (UTF-16 code unit order) agrees with Firestore rules' string
+    // `<` (Unicode code point order), which holds for the alphanumeric charset Firebase
+    // Auth uids use. expiresAt is checked here (not just filtered client-side) since
+    // story photos are more sensitive than the MeetMePresence rows that precedent
+    // covers. Like meetMePresence, this does not additionally check blockedUids — a
+    // blocked match can still read your stories, same as they can still read old chat
+    // history; a deliberate, documented scope cut, not an oversight.
+    match /{path=**}/stories/{storyId} {
+      allow read: if request.auth != null
+                  && (resource.data.authorUid == request.auth.uid || isMatchedWith(resource.data.authorUid))
+                  && resource.data.expiresAt > request.time;
+      allow write: if false;
+    }
+
+    function isMatchedWith(otherUid) {
+      let pair = request.auth.uid < otherUid
+        ? request.auth.uid + '_' + otherUid
+        : otherUid + '_' + request.auth.uid;
+      return exists(/databases/$(database)/documents/conversations/$(pair));
+    }
+
     // By default, if no rule above matches a path, access is denied.
     // This means any other collections or paths not explicitly allowed are protected.
   }

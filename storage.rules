@@ -17,6 +17,21 @@ service firebase.storage {
       allow delete: if request.auth != null && request.auth.uid == uid;
     }
 
+    // Story photos: matches-only visibility (see firestore.rules' stories block), which
+    // Storage rules can't cheaply enforce per-request the same way — getDownloadURL()
+    // mints a permanent bypass token independent of these rules, which would defeat the
+    // whole point here. So reads are denied outright; the only way to fetch a story
+    // photo is a short-lived Admin-SDK-signed URL from getStoryMediaUrlAction, which
+    // re-verifies the match (and expiresAt) server-side on every request.
+    match /storyMedia/{uid}/{fileName} {
+      allow read: if false;
+      allow write: if request.auth != null
+                   && request.auth.uid == uid
+                   && request.resource.size < 5 * 1024 * 1024
+                   && request.resource.contentType.matches('image/.*');
+      allow delete: if request.auth != null && request.auth.uid == uid;
+    }
+
     match /{allPaths=**} {
       allow read, write: if false;
     }
