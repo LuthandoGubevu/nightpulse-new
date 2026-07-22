@@ -141,40 +141,21 @@ service cloud.firestore {
     }
 
     // Stories/status updates — ephemeral posts (photo or text-only), visible only to
-    // the author and their Meet Me matches. A single wildcard block so the SAME rule
-    // covers both a direct users/{uid}/stories read and a collectionGroup("stories")
-    // query (the matches page batches "who has an active story" across many authors at
-    // once). Reuses the deterministic conversationId scheme from expressInterestAction
-    // (sorted uid pair) instead of a denormalized matched-uids list — assumes JS's
-    // default Array.sort() (UTF-16 code unit order) agrees with Firestore rules' string
-    // `<` (Unicode code point order), which holds for the alphanumeric charset Firebase
-    // Auth uids use. Expiry is enforced purely client-side (same as MeetMePresence) —
-    // see Addendum 27/28 history for why a rule-level expiresAt check doesn't work here.
-    //
-    // Derives the owner's uid from the DOCUMENT PATH (path[1], since every story lives
-    // at users/{uid}/stories/{storyId}) rather than resource.data.authorUid. This isn't
-    // just style: Firestore rejects a whole QUERY up front unless it can prove every
-    // potential result satisfies the rule from the query's own filters — the
-    // "own stories" query (collection(firestore,"users",uid,"stories")) has no filter
-    // on authorUid (it doesn't need one; the path itself already scopes to that uid),
-    // so a resource.data.authorUid-based condition was denying that query outright, the
-    // same class of failure the expiresAt clause caused before. Path segments aren't
-    // subject to that limitation, so this sidesteps it entirely instead of requiring a
-    // matching client-side where() filter. Like meetMePresence, this does not check
-    // blockedUids — a blocked match can still read your stories, same as they can still
-    // read old chat history; a deliberate, documented scope cut, not an oversight.
+    // the author and their Meet Me matches. Admin-SDK-only, same lockdown pattern as
+    // visits/safetyRatings/interests above — all reads AND writes go through
+    // storyActions.ts. This isn't the original design: story visibility depends on "is
+    // the requester matched with this document's author," a relationship between two
+    // different people that direct-client Firestore rules can't express for list/
+    // collectionGroup queries — Firestore requires a rule to be provable from the
+    // query's own filters for every potential result, and three attempts (a data-field
+    // check, a path-segment check, with and without an expiresAt clause) were each
+    // confirmed live to deny the query outright, since "matched with" can't be
+    // expressed as a where() filter. Reads now go through
+    // getOwnActiveStoriesAction/getMatchesActiveStoriesAction/getUserStoriesAction,
+    // which re-derive "matched with" server-side via the same conversations existence
+    // check, with no rules-provability constraint to fight.
     match /{path=**}/stories/{storyId} {
-      allow read: if request.auth != null
-                  && path.size() == 2 && path[0] == 'users'
-                  && (path[1] == request.auth.uid || isMatchedWith(path[1]));
-      allow write: if false;
-    }
-
-    function isMatchedWith(otherUid) {
-      let pair = request.auth.uid < otherUid
-        ? request.auth.uid + '_' + otherUid
-        : otherUid + '_' + request.auth.uid;
-      return exists(/databases/$(database)/documents/conversations/$(pair));
+      allow read, write: if false;
     }
 
     // By default, if no rule above matches a path, access is denied.
