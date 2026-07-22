@@ -3,11 +3,13 @@
 
 import { revalidatePath } from "next/cache";
 import { adminFirestore } from "@/lib/firebaseAdmin";
-import { Timestamp } from "firebase-admin/firestore";
+import { Timestamp, FieldValue } from "firebase-admin/firestore";
 import { verifyAdminIdToken } from "@/lib/serverAuth";
-import type { Club, HeartbeatEntry } from "@/types";
+import type { Club, ClubWithId, HeartbeatEntry } from "@/types";
 import { z } from "zod";
-import { parseCommaSeparatedString } from "@/lib/utils";
+import { parseCommaSeparatedString, getClubStatus } from "@/lib/utils";
+
+const DEFAULT_CAPACITY_THRESHOLDS = { low: 50, moderate: 100, packed: 150 };
 
 const ClubSchema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -79,12 +81,14 @@ export async function addClubAction(idToken: string, formData: FormData) {
 
   const clubDataValidated = validation.data;
 
-  const clubDataForFirestore: Omit<Club, 'lastUpdated' | 'announcementExpiresAt'> & { lastUpdated: Timestamp; announcementExpiresAt: Timestamp | null } = {
+  // currentCount/capacityThresholds never land on the public clubs/{clubId} doc — see
+  // firestore.rules — only the derived status does. The raw values go to the
+  // Admin-SDK-only private/capacity subdoc below.
+  const clubDataForFirestore: Omit<Club, 'lastUpdated' | 'announcementExpiresAt' | 'currentCount' | 'capacityThresholds'> & { lastUpdated: Timestamp; announcementExpiresAt: Timestamp | null } = {
     name: clubDataValidated.name,
     address: clubDataValidated.address,
     location: clubDataValidated.location,
-    currentCount: clubDataValidated.currentCount, // Admin-set base count
-    capacityThresholds: clubDataValidated.capacityThresholds,
+    status: getClubStatus(clubDataValidated.currentCount, clubDataValidated.capacityThresholds),
     imageUrl: clubDataValidated.imageUrl || '',
     estimatedWaitTime: clubDataValidated.estimatedWaitTime || '',
     tags: clubDataValidated.tags || [],
@@ -96,7 +100,12 @@ export async function addClubAction(idToken: string, formData: FormData) {
   };
 
   try {
-    await adminFirestore.collection("clubs").add(clubDataForFirestore);
+    const clubRef = adminFirestore.collection("clubs").doc();
+    await clubRef.set(clubDataForFirestore);
+    await clubRef.collection("private").doc("capacity").set({
+      currentCount: clubDataValidated.currentCount,
+      capacityThresholds: clubDataValidated.capacityThresholds,
+    });
     revalidatePath("/admin/clubs");
     revalidatePath("/");
     return { success: true };
@@ -152,12 +161,14 @@ export async function updateClubAction(idToken: string, clubId: string, formData
 
   const clubDataValidated = validation.data;
 
-  const clubDataForFirestore: Partial<Omit<Club, 'lastUpdated' | 'announcementExpiresAt'>> & { lastUpdated: Timestamp; announcementExpiresAt: Timestamp | null } = {
+  // Same split as addClubAction: raw currentCount/capacityThresholds go to the private
+  // subdoc; the public doc only ever gets the derived status. FieldValue.delete() also
+  // scrubs the raw fields off any club still carrying them from before this change.
+  const clubDataForFirestore: Partial<Omit<Club, 'lastUpdated' | 'announcementExpiresAt' | 'currentCount' | 'capacityThresholds'>> & { lastUpdated: Timestamp; announcementExpiresAt: Timestamp | null; currentCount: FieldValue; capacityThresholds: FieldValue } = {
     name: clubDataValidated.name,
     address: clubDataValidated.address,
     location: clubDataValidated.location,
-    currentCount: clubDataValidated.currentCount, // Admin-set base count
-    capacityThresholds: clubDataValidated.capacityThresholds,
+    status: getClubStatus(clubDataValidated.currentCount, clubDataValidated.capacityThresholds),
     imageUrl: clubDataValidated.imageUrl || '',
     estimatedWaitTime: clubDataValidated.estimatedWaitTime || '',
     tags: clubDataValidated.tags || [],
@@ -166,10 +177,17 @@ export async function updateClubAction(idToken: string, clubId: string, formData
     announcementMessage: clubDataValidated.announcementMessage || '',
     announcementExpiresAt: clubDataValidated.announcementExpiresAt,
     lastUpdated: Timestamp.now(),
+    currentCount: FieldValue.delete(),
+    capacityThresholds: FieldValue.delete(),
   };
 
   try {
-    await adminFirestore.collection("clubs").doc(clubId).update(clubDataForFirestore);
+    const clubRef = adminFirestore.collection("clubs").doc(clubId);
+    await clubRef.update(clubDataForFirestore);
+    await clubRef.collection("private").doc("capacity").set({
+      currentCount: clubDataValidated.currentCount,
+      capacityThresholds: clubDataValidated.capacityThresholds,
+    }, { merge: true });
     revalidatePath("/admin/clubs");
     revalidatePath(`/admin/clubs/edit/${clubId}`);
     revalidatePath("/");
@@ -189,7 +207,9 @@ export async function deleteClubAction(idToken: string, clubId: string) {
   if (!adminFirestore) return { success: false, error: "Server Firestore (Admin) not initialized" };
 
   try {
-    await adminFirestore.collection("clubs").doc(clubId).delete();
+    const clubRef = adminFirestore.collection("clubs").doc(clubId);
+    await clubRef.collection("private").doc("capacity").delete();
+    await clubRef.delete();
     revalidatePath("/admin/clubs");
     revalidatePath("/");
     return { success: true };
@@ -221,18 +241,26 @@ export async function getClubById(clubId: string): Promise<Club | null> {
     return null;
   }
   try {
-    const clubSnap = await adminFirestore.collection("clubs").doc(clubId).get();
+    const clubRef = adminFirestore.collection("clubs").doc(clubId);
+    const [clubSnap, capacitySnap] = await Promise.all([
+      clubRef.get(),
+      clubRef.collection("private").doc("capacity").get(),
+    ]);
 
-    if (clubSnap.exists) {
-      const data = clubSnap.data();
-      const clubWithConvertedTimestamps = convertClubTimestamps(data);
-      return {
-        id: clubSnap.id,
-        ...clubWithConvertedTimestamps,
-      } as Club; // Casting as Club, client will merge live count
-    } else {
-      return null;
-    }
+    if (!clubSnap.exists) return null;
+
+    const data = clubSnap.data();
+    const clubWithConvertedTimestamps = convertClubTimestamps(data);
+    const capacityData = capacitySnap.exists ? capacitySnap.data() : undefined;
+
+    return {
+      id: clubSnap.id,
+      ...clubWithConvertedTimestamps,
+      // This function is only ever called from admin-gated pages (the edit form), so
+      // merging the private capacity doc back in here is safe — see firestore.rules.
+      currentCount: capacityData?.currentCount ?? 0,
+      capacityThresholds: capacityData?.capacityThresholds ?? DEFAULT_CAPACITY_THRESHOLDS,
+    } as Club;
   } catch (error) {
     console.error("Error fetching club by ID:", error);
     return null;
@@ -240,10 +268,102 @@ export async function getClubById(clubId: string): Promise<Club | null> {
 }
 
 /**
- * Derives live crowd counts for all clubs based on recent heartbeats.
+ * Admin-only club listing with the raw currentCount/capacityThresholds merged back in
+ * from the private capacity subdoc — feeds the admin clubs table, which (unlike the
+ * public dashboard) is allowed to show exact numbers.
+ */
+export async function getAdminClubList(idToken: string): Promise<ClubWithId[]> {
+  const authCheck = await verifyAdminIdToken(idToken);
+  if (!authCheck.ok) {
+    console.warn("getAdminClubList: unauthorized caller.", authCheck.error);
+    return [];
+  }
+
+  if (!adminFirestore) {
+    console.warn("Firestore admin not initialized in getAdminClubList. Returning empty list.");
+    return [];
+  }
+
+  try {
+    const clubsSnap = await adminFirestore.collection("clubs").orderBy("name").get();
+    const clubs = await Promise.all(
+      clubsSnap.docs.map(async (doc) => {
+        const capacitySnap = await doc.ref.collection("private").doc("capacity").get();
+        const capacityData = capacitySnap.exists ? capacitySnap.data() : undefined;
+        const clubWithConvertedTimestamps = convertClubTimestamps(doc.data());
+        return {
+          id: doc.id,
+          ...clubWithConvertedTimestamps,
+          currentCount: capacityData?.currentCount ?? 0,
+          capacityThresholds: capacityData?.capacityThresholds ?? DEFAULT_CAPACITY_THRESHOLDS,
+        } as ClubWithId;
+      })
+    );
+    return clubs;
+  } catch (error) {
+    console.error("Error fetching admin club list:", error);
+    return [];
+  }
+}
+
+/**
+ * One-time migration (Addendum 24): moves currentCount/capacityThresholds off any club
+ * doc still carrying them from before the private-subcollection split into
+ * clubs/{clubId}/private/capacity, and backfills the derived `status` field onto the
+ * public doc. Safe to run more than once — a club with no legacy fields left on its main
+ * doc is simply skipped. Triggered once from a button on the admin clubs page; no need
+ * to keep re-running it after every existing club has been migrated.
+ */
+export async function migrateLegacyClubCapacityAction(
+  idToken: string
+): Promise<{ success: boolean; migrated?: number; error?: string }> {
+  const authCheck = await verifyAdminIdToken(idToken);
+  if (!authCheck.ok) return { success: false, error: authCheck.error };
+
+  if (!adminFirestore) return { success: false, error: "Server Firestore (Admin) not initialized" };
+
+  try {
+    const clubsSnap = await adminFirestore.collection("clubs").get();
+    let migrated = 0;
+
+    for (const doc of clubsSnap.docs) {
+      const data = doc.data();
+      if (data.currentCount === undefined && data.capacityThresholds === undefined) continue;
+
+      const currentCount = typeof data.currentCount === "number" ? data.currentCount : 0;
+      const capacityThresholds = data.capacityThresholds ?? DEFAULT_CAPACITY_THRESHOLDS;
+
+      await doc.ref.collection("private").doc("capacity").set({ currentCount, capacityThresholds }, { merge: true });
+      await doc.ref.update({
+        status: getClubStatus(currentCount, capacityThresholds),
+        currentCount: FieldValue.delete(),
+        capacityThresholds: FieldValue.delete(),
+      });
+      migrated++;
+    }
+
+    revalidatePath("/admin/clubs");
+    revalidatePath("/");
+    return { success: true, migrated };
+  } catch (error: any) {
+    return { success: false, error: error.message || "Migration failed." };
+  }
+}
+
+/**
+ * Derives live crowd counts for all clubs based on recent heartbeats. Admin-only: this
+ * is exactly the kind of exact headcount club owners don't want reachable by the public
+ * (see Addendum 24), so — like getRecentHeartbeats/getRecentVisitSessions below — it now
+ * requires an admin-verified idToken. Its only caller is the admin analytics dashboard.
  * @returns A Promise resolving to an object mapping clubId to its live count.
  */
-export async function getLiveClubCounts(): Promise<Record<string, number>> {
+export async function getLiveClubCounts(idToken: string): Promise<Record<string, number>> {
+  const authCheck = await verifyAdminIdToken(idToken);
+  if (!authCheck.ok) {
+    console.warn("getLiveClubCounts: unauthorized caller.", authCheck.error);
+    return {};
+  }
+
   if (!adminFirestore) {
     console.warn("Firestore admin not initialized in getLiveClubCounts. Returning empty counts.");
     return {};

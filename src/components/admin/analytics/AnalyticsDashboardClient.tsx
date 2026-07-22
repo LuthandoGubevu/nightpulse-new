@@ -189,11 +189,15 @@ export function AnalyticsDashboardClient() {
   }, []);
 
   useEffect(() => {
-    getLiveClubCounts()
-      .then(setLiveCounts)
-      .catch((err) => {
+    (async () => {
+      const idToken = await auth?.currentUser?.getIdToken();
+      if (!idToken) return;
+      try {
+        setLiveCounts(await getLiveClubCounts(idToken));
+      } catch (err) {
         console.error("Error fetching live club counts:", err);
-      });
+      }
+    })();
   }, []);
 
   useEffect(() => {

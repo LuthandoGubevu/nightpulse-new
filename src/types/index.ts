@@ -8,12 +8,20 @@ export interface Club {
     lat: number;
     lng: number;
   } | null; // GeoPoint can be null
-  currentCount: number; // This will represent the live count on the dashboard, derived from heartbeats. Admins might set a base/manual value.
-  capacityThresholds: {
+  // Raw headcount + thresholds live in clubs/{clubId}/private/capacity (Admin-SDK-only —
+  // see firestore.rules) so they're only ever present when fetched via an admin-verified
+  // path (ClubForm, admin clubs table). Optional here because ordinary end-user reads of
+  // a club never carry these fields at all.
+  currentCount?: number;
+  capacityThresholds?: {
     low: number;
     moderate: number;
     packed: number;
   };
+  // Public-safe derived status (see getClubStatus) — the only capacity signal exposed to
+  // non-admin clients. Computed and written server-side whenever currentCount/thresholds
+  // change (see addClubAction/updateClubAction).
+  status?: ClubStatus;
   lastUpdated: Timestamp | Date | string; // Firestore Timestamp, Date object after fetch, or string
   imageUrl?: string; // Optional image URL for the club
 

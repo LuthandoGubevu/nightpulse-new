@@ -15,12 +15,23 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { haversineDistance, getClubStatus } from "@/lib/utils";
+import { haversineDistance } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { useGeofenceAutoCheckin } from "@/hooks/useGeofenceAutoCheckin";
 import { useHeartbeatTracker } from "@/hooks/useHeartbeatTracker";
-import { getLiveClubCounts } from "@/actions/clubActions"; 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import type { ClubStatus } from "@/types";
+
+// Ranks the public-safe status enum for the "Most Crowded" sort — the raw headcount
+// that used to drive this sort is admin-only now (Addendum 24), so this ranks by tier
+// instead of an exact number.
+const STATUS_RANK: Record<ClubStatus, number> = {
+  unknown: 0,
+  low: 1,
+  moderate: 2,
+  packed: 3,
+  "over-packed": 4,
+};
 import { usePwaInstall } from "@/hooks/usePwaInstall";
 import { PwaInstallPrompt } from "@/components/common/PwaInstallPrompt";
 
@@ -94,7 +105,6 @@ export default function DashboardPage() {
 
   const [activeGeofenceClubId, setActiveGeofenceClubId] = useState<string | null>(null);
 
-  const [liveClubCounts, setLiveClubCounts] = useState<Record<string, number>>({});
   const [myRatings, setMyRatings] = useState<Record<string, number>>({});
   const [firestoreError, setFirestoreError] = useState<string | null>(null);
 
@@ -121,13 +131,13 @@ export default function DashboardPage() {
         if (data.announcementExpiresAt) {
             announcementExpiresAt = data.announcementExpiresAt instanceof Timestamp ? data.announcementExpiresAt.toDate() : new Date(data.announcementExpiresAt);
         }
+        const status: ClubStatus = data.status ?? "unknown";
         return {
           id: doc.id,
           name: data.name || "Unnamed Club",
           address: data.address || "No address",
           location: data.location || null,
-          currentCount: data.currentCount || 0, // Base count from admin
-          capacityThresholds: data.capacityThresholds || { low: 50, moderate: 100, packed: 150 },
+          status,
           lastUpdated: data.lastUpdated instanceof Timestamp ? data.lastUpdated.toDate().toISOString() : new Date().toISOString(),
           imageUrl: data.imageUrl || `https://placehold.co/600x400.png`,
           data_ai_hint: data.data_ai_hint || (data.name ? data.name.toLowerCase().split(" ").slice(0,2).join(" ") : "nightclub"),
@@ -139,42 +149,21 @@ export default function DashboardPage() {
           announcementExpiresAt: announcementExpiresAt,
           safetyRatingSum: data.safetyRatingSum ?? 0,
           safetyRatingCount: data.safetyRatingCount ?? 0,
-          isTrending: getClubStatus(liveClubCounts[doc.id] ?? data.currentCount ?? 0, data.capacityThresholds || {}) === 'packed' || getClubStatus(liveClubCounts[doc.id] ?? data.currentCount ?? 0, data.capacityThresholds || {}) === 'over-packed',
+          isTrending: status === 'packed' || status === 'over-packed',
         } as ClubWithId;
       });
-      
+
       setAllClubs(clubList);
       setLoadingClubs(false);
     }, (error) => {
       console.error("Error fetching clubs with real-time listener:", error);
       toast({ title: "Error", description: "Could not fetch club data. Please try again later.", variant: "destructive" });
-      setAllClubs([]); 
+      setAllClubs([]);
       setLoadingClubs(false);
       setFirestoreError("Failed to load club data from Firestore.");
     });
     return () => unsubscribe();
-  }, [toast, liveClubCounts]); // liveClubCounts dependency to re-evaluate isTrending
-
-  const fetchLiveCounts = useCallback(async () => {
-    if (!firestore) {
-        // console.warn("Firestore not initialized, skipping live count fetch.");
-        setLiveClubCounts({}); // Ensure it's empty if no firestore
-        return;
-    }
-    try {
-      const counts = await getLiveClubCounts();
-      setLiveClubCounts(counts);
-    } catch (error) {
-      console.error("Failed to fetch live club counts:", error);
-      // Potentially set liveClubCounts to {} or show a toast
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchLiveCounts();
-    const interval = setInterval(fetchLiveCounts, 1 * 60 * 1000);
-    return () => clearInterval(interval);
-  }, [fetchLiveCounts]);
+  }, [toast]);
 
   // Fetch this user's own safety-rating votes once per login/club-set change (not
   // polled — this data only changes via the user's own actions, which the
@@ -289,34 +278,32 @@ export default function DashboardPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const clubsWithLiveCountsAndDistance = useMemo(() => {
+  const processedClubs = useMemo(() => {
     let clubsToProcess = allClubs.map(club => ({
       ...club,
-      // Prioritize live count. If not available, use the admin-set base count.
-      currentCount: liveClubCounts[club.id] ?? club.currentCount ?? 0, 
-      isTrending: getClubStatus(liveClubCounts[club.id] ?? club.currentCount ?? 0, club.capacityThresholds || {}) === 'packed' || getClubStatus(liveClubCounts[club.id] ?? club.currentCount ?? 0, club.capacityThresholds || {}) === 'over-packed',
       distance: userLocation && club.location ? haversineDistance(userLocation.lat, userLocation.lng, club.location.lat, club.location.lng) : Infinity,
       myRating: myRatings[club.id] ?? null,
     }));
 
     if (filterTags.length > 0) {
-      clubsToProcess = clubsToProcess.filter(club => 
+      clubsToProcess = clubsToProcess.filter(club =>
         filterTags.every(filterTag => {
           if (filterTag === "trending") return club.isTrending;
           return club.tags?.includes(filterTag);
         })
       );
     }
-    
+
     if (sortBy === "nearby" && userLocation) {
          clubsToProcess.sort((a, b) => (a.distance ?? Infinity) - (b.distance ?? Infinity));
-    } else if (sortBy === "crowded") { 
-        clubsToProcess.sort((a,b) => (b.currentCount || 0) - (a.currentCount || 0));
-    } else { 
+    } else if (sortBy === "crowded") {
+        // Raw headcounts are admin-only now (Addendum 24) — rank by status tier instead.
+        clubsToProcess.sort((a, b) => STATUS_RANK[b.status ?? "unknown"] - STATUS_RANK[a.status ?? "unknown"]);
+    } else {
         clubsToProcess.sort((a,b) => a.name.localeCompare(b.name));
     }
     return clubsToProcess;
-  }, [allClubs, userLocation, sortBy, filterTags, liveClubCounts, myRatings]);
+  }, [allClubs, userLocation, sortBy, filterTags, myRatings]);
 
 
   const handleSortChange = (value: string) => {
@@ -412,7 +399,7 @@ export default function DashboardPage() {
       </div>
 
       <div className="mt-6">
-        <ClubList clubs={clubsWithLiveCountsAndDistance} activeGeofenceClubId={activeGeofenceClubId} />
+        <ClubList clubs={processedClubs} activeGeofenceClubId={activeGeofenceClubId} />
       </div>
     </div>
   );

@@ -59,11 +59,12 @@ export const columns: ColumnDef<ClubWithId>[] = [
     header: "Crowd",
     cell: ({ row }) => {
       const club = row.original;
-      const status = getClubStatus(club.currentCount, club.capacityThresholds);
+      const currentCount = club.currentCount ?? 0;
+      const status = getClubStatus(currentCount, club.capacityThresholds);
       return (
         <div className="flex items-center space-x-2">
           <ClubStatusIndicator status={status} />
-          <span>{club.currentCount}</span>
+          <span>{currentCount}</span>
         </div>
       );
     },
