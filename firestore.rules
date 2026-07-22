@@ -148,18 +148,25 @@ service cloud.firestore {
     // (sorted uid pair) instead of a denormalized matched-uids list — assumes JS's
     // default Array.sort() (UTF-16 code unit order) agrees with Firestore rules' string
     // `<` (Unicode code point order), which holds for the alphanumeric charset Firebase
-    // Auth uids use. Expiry is enforced purely client-side (same as MeetMePresence),
-    // NOT in this rule: Firestore rejects an entire query up front if the rule
-    // references a field the query doesn't also filter on, since it can't prove every
-    // potential result satisfies it — neither story query here filters on expiresAt, so
-    // an `expiresAt > request.time` clause here would deny the whole query, not just
-    // expired docs (this broke both story queries in testing before this fix). Like
-    // meetMePresence, this also does not check blockedUids — a blocked match can still
-    // read your stories, same as they can still read old chat history; a deliberate,
-    // documented scope cut, not an oversight.
+    // Auth uids use. Expiry is enforced purely client-side (same as MeetMePresence) —
+    // see Addendum 27/28 history for why a rule-level expiresAt check doesn't work here.
+    //
+    // Derives the owner's uid from the DOCUMENT PATH (path[1], since every story lives
+    // at users/{uid}/stories/{storyId}) rather than resource.data.authorUid. This isn't
+    // just style: Firestore rejects a whole QUERY up front unless it can prove every
+    // potential result satisfies the rule from the query's own filters — the
+    // "own stories" query (collection(firestore,"users",uid,"stories")) has no filter
+    // on authorUid (it doesn't need one; the path itself already scopes to that uid),
+    // so a resource.data.authorUid-based condition was denying that query outright, the
+    // same class of failure the expiresAt clause caused before. Path segments aren't
+    // subject to that limitation, so this sidesteps it entirely instead of requiring a
+    // matching client-side where() filter. Like meetMePresence, this does not check
+    // blockedUids — a blocked match can still read your stories, same as they can still
+    // read old chat history; a deliberate, documented scope cut, not an oversight.
     match /{path=**}/stories/{storyId} {
       allow read: if request.auth != null
-                  && (resource.data.authorUid == request.auth.uid || isMatchedWith(resource.data.authorUid));
+                  && path.size() == 2 && path[0] == 'users'
+                  && (path[1] == request.auth.uid || isMatchedWith(path[1]));
       allow write: if false;
     }
 
