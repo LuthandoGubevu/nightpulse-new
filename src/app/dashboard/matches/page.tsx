@@ -10,10 +10,10 @@ import { PageHeader } from "@/components/common/PageHeader";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Icons } from "@/components/icons";
 import { Skeleton } from "@/components/ui/skeleton";
-import { StoryRing } from "@/components/stories/StoryRing";
+import { StoryPreviewTile, type StoryPreview } from "@/components/stories/StoryPreviewTile";
 import { StoryComposerDialog } from "@/components/stories/StoryComposerDialog";
 import { StoryViewer } from "@/components/stories/StoryViewer";
-import { getOwnActiveStoriesAction, getMatchesActiveStoriesAction, type SerializedStory } from "@/actions/storyActions";
+import { getOwnActiveStoriesAction, getMatchesActiveStoriesAction, getStoryMediaUrlAction, type SerializedStory } from "@/actions/storyActions";
 import { useToast } from "@/hooks/use-toast";
 import type { ConversationWithId } from "@/types";
 
@@ -34,6 +34,7 @@ export default function MatchesPage() {
   const [ownProfile, setOwnProfile] = useState<{ displayName: string; photoUrl: string | null } | null>(null);
   const [ownStories, setOwnStories] = useState<SerializedStory[]>([]);
   const [storiesByAuthor, setStoriesByAuthor] = useState<Record<string, SerializedStory[]>>({});
+  const [previewMedia, setPreviewMedia] = useState<Record<string, StoryPreview>>({});
   const [composerOpen, setComposerOpen] = useState(false);
   const [viewer, setViewer] = useState<{
     authorUid: string;
@@ -146,16 +147,61 @@ export default function MatchesPage() {
 
   const matchesWithActiveStories = rows.filter((row) => (storiesByAuthor[row.otherUid]?.length ?? 0) > 0);
 
+  // Thumbnail previews for the story bar — the tile shows the latest active story's own
+  // content (photo or text card), not just the person's profile photo, so this mints a
+  // short-lived signed URL per photo story (same getStoryMediaUrlAction StoryViewer uses)
+  // rather than a permanent download URL.
+  useEffect(() => {
+    const entries: [string, SerializedStory][] = [];
+    if (ownStories.length > 0) entries.push(["own", ownStories[ownStories.length - 1]]);
+    for (const [uid, stories] of Object.entries(storiesByAuthor)) {
+      if (stories.length > 0) entries.push([uid, stories[stories.length - 1]]);
+    }
+    if (entries.length === 0) {
+      setPreviewMedia({});
+      return;
+    }
+
+    let cancelled = false;
+    (async () => {
+      const idToken = await auth?.currentUser?.getIdToken();
+      if (!idToken) return;
+      const results = await Promise.all(
+        entries.map(async ([key, story]): Promise<[string, StoryPreview]> => {
+          if (story.mediaType === "text") {
+            return [key, { kind: "text", text: story.text ?? "", backgroundColor: story.backgroundColor ?? "#7c3aed" }];
+          }
+          const authorUid = key === "own" ? user?.uid : key;
+          if (!authorUid) return [key, { kind: "none" }];
+          try {
+            const result = await getStoryMediaUrlAction(idToken, authorUid, story.id);
+            if (result?.success && result.url) {
+              return [key, { kind: "image", url: result.url }];
+            }
+          } catch {
+            // fall through to "none" — the full StoryViewer surfaces a proper error if opened
+          }
+          return [key, { kind: "none" }];
+        })
+      );
+      if (!cancelled) setPreviewMedia(Object.fromEntries(results));
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [ownStories, storiesByAuthor, user]);
+
   return (
     <div className="container mx-auto py-8 px-4">
       <PageHeader title="Your matches" description="Conversations from mutual Meet Me interest." />
 
       <div className="mt-6 flex items-center gap-4 overflow-x-auto pb-2">
         <div className="relative shrink-0">
-          <StoryRing
-            photoUrl={ownProfile?.photoUrl ?? null}
+          <StoryPreviewTile
             displayName="Your story"
             hasActiveStory={ownStories.length > 0}
+            preview={previewMedia.own ?? { kind: "none" }}
+            fallbackPhotoUrl={ownProfile?.photoUrl ?? null}
             onClick={() =>
               ownStories.length > 0
                 ? setViewer({
@@ -172,18 +218,19 @@ export default function MatchesPage() {
             type="button"
             onClick={() => setComposerOpen(true)}
             aria-label="Add to your story"
-            className="absolute bottom-4 right-0 rounded-full bg-gradient-vy-purple-pink p-1 border-2 border-background"
+            className="absolute bottom-1 right-1 rounded-full bg-gradient-vy-purple-pink p-1 border-2 border-background"
           >
             <Icons.add className="h-3.5 w-3.5 text-white" />
           </button>
         </div>
 
         {matchesWithActiveStories.map((row) => (
-          <StoryRing
+          <StoryPreviewTile
             key={row.otherUid}
-            photoUrl={row.otherPhotoUrl}
             displayName={row.otherName}
             hasActiveStory
+            preview={previewMedia[row.otherUid] ?? { kind: "none" }}
+            fallbackPhotoUrl={row.otherPhotoUrl}
             onClick={() =>
               setViewer({
                 authorUid: row.otherUid,
