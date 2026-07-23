@@ -52,6 +52,7 @@ import {
   Ban,
   Camera,
   UserRound,
+  ImageOff,
 } from "lucide-react"
 
 // A simple Google icon SVG as lucide-react doesn't have one directly
@@ -121,5 +122,6 @@ export const Icons = {
   ban: Ban,
   camera: Camera,
   userRound: UserRound,
+  imageOff: ImageOff,
 }
 

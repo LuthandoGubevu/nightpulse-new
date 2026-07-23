@@ -43,6 +43,7 @@ export function StoryViewer({
   const [paused, setPaused] = useState(false);
   const [mediaUrl, setMediaUrl] = useState<string | null>(null);
   const [loadingMedia, setLoadingMedia] = useState(false);
+  const [mediaError, setMediaError] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const mediaCacheRef = useRef<Map<string, string>>(new Map());
 
@@ -67,11 +68,13 @@ export function StoryViewer({
     const cached = mediaCacheRef.current.get(current.id);
     if (cached) {
       setMediaUrl(cached);
+      setMediaError(false);
       return;
     }
     let cancelled = false;
     setLoadingMedia(true);
     setMediaUrl(null);
+    setMediaError(false);
     (async () => {
       try {
         const idToken = await auth?.currentUser?.getIdToken();
@@ -214,11 +217,21 @@ export function StoryViewer({
               <p className="max-w-md break-words px-8 text-center text-2xl font-semibold text-white">
                 {current.text}
               </p>
+            ) : mediaError ? (
+              <div className="flex flex-col items-center gap-2 text-white/70">
+                <Icons.imageOff className="h-8 w-8" />
+                <span className="text-sm">Couldn&apos;t display this photo</span>
+              </div>
             ) : loadingMedia || !mediaUrl ? (
               <Icons.spinner className="h-8 w-8 animate-spin text-white/70" />
             ) : (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={mediaUrl} alt="" className="max-h-full max-w-full object-contain" />
+              <img
+                src={mediaUrl}
+                alt=""
+                className="max-h-full max-w-full object-contain"
+                onError={() => setMediaError(true)}
+              />
             )}
 
             {current.mediaType === "image" && current.text && (

@@ -111,12 +111,21 @@ export function StoryComposerDialog({ open, onOpenChange, onPosted }: StoryCompo
       if (mode === "image") {
         if (!storage) throw new Error("Storage is not available.");
 
-        let uploadBlob: Blob = photoFile!;
+        let uploadBlob: Blob;
         try {
           uploadBlob = await compressImageForUpload(photoFile!);
-        } catch {
-          // Fall back to the original file if compression fails for any reason
-          // (unsupported format, etc.) — the size check below still guards it.
+        } catch (error) {
+          // Don't fall back to uploading the original file — it may be a format
+          // (e.g. HEIC) the canvas pipeline couldn't decode, and uploading it
+          // anyway while still labeling it "image/jpeg" produces a file that
+          // silently fails to render anywhere later (no error, just a broken image).
+          console.error("Error compressing story photo:", error);
+          toast({
+            title: "Couldn't process this photo",
+            description: "This photo's format isn't supported — please try a different photo (e.g. a screenshot or a standard JPEG/PNG).",
+            variant: "destructive",
+          });
+          return;
         }
         if (uploadBlob.size > MAX_UPLOAD_BYTES) {
           toast({
