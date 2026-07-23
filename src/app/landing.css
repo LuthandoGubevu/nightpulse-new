@@ -21,3 +21,27 @@
 .vy-landing a { color: #c084fc; text-decoration: none; }
 .vy-landing a:hover { color: #ec4899; }
 .vy-landing ::selection { background: rgba(168,85,247,0.35); color: #fff; }
+
+/* Tablet/desktop optimization (Addendum 34) — mobile keeps the exact inline styles
+   above as its default; these only add overrides at wider viewports. !important is
+   required because the properties being overridden (font-size, max-width,
+   grid-template-columns) are set inline on the elements themselves, and inline styles
+   otherwise always win over an external stylesheet regardless of selector specificity. */
+@media (min-width: 768px) {
+  .vy-container { padding-left: 40px; padding-right: 40px; }
+  .vy-grid-steps, .vy-grid-club {
+    display: grid !important;
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+}
+
+@media (min-width: 1024px) {
+  .vy-container { padding-left: 64px; padding-right: 64px; }
+  .vy-h1 { font-size: 64px !important; }
+  .vy-h2 { font-size: 40px !important; }
+  .vy-hero-subtitle { max-width: 520px !important; }
+  .vy-grid-meters { grid-template-columns: 1.2fr 1fr !important; }
+  .vy-grid-love { grid-template-columns: repeat(4, 1fr) !important; }
+  .vy-grid-steps { grid-template-columns: repeat(4, 1fr) !important; }
+  .vy-grid-club { grid-template-columns: repeat(3, 1fr) !important; }
+}
