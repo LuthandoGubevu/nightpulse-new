@@ -2,6 +2,7 @@
 "use client";
 
 import { Card, CardContent, CardFooter, CardTitle, CardDescription } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { Icons } from "@/components/icons";
 import { HeatStrip } from "./HeatStrip";
 import { ClubRatingIndicator } from "./ClubRatingIndicator";
@@ -31,6 +32,14 @@ export function ClubCard({ club, isHereNow = false }: ClubCardProps) {
 
     return expiryDate > new Date();
   };
+
+  // Prefer the pinned coordinates; fall back to the address as a free-text destination
+  // so the button always does something useful, even for a club an admin hasn't pinned
+  // on the map yet.
+  const directionsQuery = club.location
+    ? `${club.location.lat},${club.location.lng}`
+    : club.address;
+  const directionsUrl = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(directionsQuery)}`;
 
   return (
     <Card variant="vy-glass" className="flex flex-col overflow-hidden hover:shadow-glow-vy-lg transition-shadow duration-300">
@@ -98,6 +107,11 @@ export function ClubCard({ club, isHereNow = false }: ClubCardProps) {
           )}
       </CardContent>
       <CardFooter className="p-4 border-t border-white/10 flex flex-col items-stretch gap-2">
+        <Button asChild variant="outline">
+          <a href={directionsUrl} target="_blank" rel="noopener noreferrer">
+            <Icons.navigation className="mr-2 h-4 w-4" /> Directions
+          </a>
+        </Button>
         <div className="flex items-center justify-between">
           <span className="text-sm font-medium text-muted-foreground">Safety Rating</span>
           <ClubRatingIndicator sum={club.safetyRatingSum ?? 0} count={club.safetyRatingCount ?? 0} size="sm" />
