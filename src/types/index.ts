@@ -90,6 +90,10 @@ export interface UserProfile {
   blockedUids: string[];
   createdAt: Timestamp;
   updatedAt: Timestamp;
+  // Written directly by the client (see usePresenceHeartbeat.ts) every ~60s while any
+  // authenticated page is open — the one field on this doc clients may self-write.
+  // "Online" = updated within the last ~2 minutes; otherwise shown as "last seen ...".
+  lastActiveAt?: Timestamp;
 }
 
 // clubs/{clubId}/meetMePresence/{uid} — a snapshot of the user's profile taken at
@@ -124,6 +128,12 @@ export interface Conversation {
   createdAt: Timestamp;
   lastMessageAt: Timestamp;
   lastMessageText: string;
+  lastMessageSenderUid?: string; // powers the matches list's "you sent" tick indicator
+  // Written by a participant (direct client write, see firestore.rules) when they open/
+  // are viewing this thread — keyed by their own uid only. Powers both the "Unread"
+  // filter (lastMessageAt > lastReadAt[myUid]) and real read-tick indicators on my own
+  // last-sent message (blue once lastReadAt[otherUid] > that message's createdAt).
+  lastReadAt?: Record<string, Timestamp>;
 }
 
 export interface ConversationWithId extends Conversation {

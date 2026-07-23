@@ -20,6 +20,7 @@ import {
 import { siteConfig } from "@/config/site";
 import { Icons } from "@/components/icons";
 import { useAuth } from "@/hooks/useAuth";
+import { usePresenceHeartbeat } from "@/hooks/usePresenceHeartbeat";
 import { auth } from "@/lib/firebase";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
@@ -36,6 +37,7 @@ export default function AppShell({ children }: AppShellProps) {
   const { user, loading: authLoading } = useAuth();
   const { toast } = useToast();
   const { isMobile, setOpenMobile } = useSidebar();
+  usePresenceHeartbeat(user?.uid);
 
   const closeSidebarOnMobile = () => {
     if (isMobile) setOpenMobile(false);

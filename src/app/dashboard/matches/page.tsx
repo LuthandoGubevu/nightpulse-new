@@ -10,12 +10,17 @@ import { PageHeader } from "@/components/common/PageHeader";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Icons } from "@/components/icons";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ChatThread } from "@/components/chat/ChatThread";
 import { StoryPreviewTile, type StoryPreview } from "@/components/stories/StoryPreviewTile";
 import { StoryComposerDialog } from "@/components/stories/StoryComposerDialog";
 import { StoryViewer } from "@/components/stories/StoryViewer";
 import { getOwnActiveStoriesAction, getMatchesActiveStoriesAction, getStoryMediaUrlAction, type SerializedStory } from "@/actions/storyActions";
 import { useToast } from "@/hooks/use-toast";
+import { cn } from "@/lib/utils";
 import type { ConversationWithId } from "@/types";
+
+const ONLINE_WINDOW_MS = 2 * 60 * 1000;
+const DESKTOP_QUERY = "(min-width: 1024px)";
 
 interface MatchRow {
   conversation: ConversationWithId;
@@ -24,12 +29,25 @@ interface MatchRow {
   otherPhotoUrl: string | null;
 }
 
+function isRowUnread(conversation: ConversationWithId, myUid: string) {
+  if (!conversation.lastMessageAt) return false;
+  const lastRead = conversation.lastReadAt?.[myUid] as any;
+  if (!lastRead || typeof lastRead.toMillis !== "function") return true;
+  return lastRead.toMillis() < (conversation.lastMessageAt as any).toMillis();
+}
+
 export default function MatchesPage() {
   const { user } = useAuth();
   const { toast } = useToast();
   const [rows, setRows] = useState<MatchRow[]>([]);
   const [loading, setLoading] = useState(true);
   const profileCacheRef = useRef<Map<string, { displayName: string; photoUrl: string | null }>>(new Map());
+  const [presenceByUid, setPresenceByUid] = useState<Record<string, any>>({});
+  const presenceUnsubsRef = useRef<Map<string, () => void>>(new Map());
+
+  const [searchQuery, setSearchQuery] = useState("");
+  const [filter, setFilter] = useState<"all" | "unread">("all");
+  const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
 
   const [ownProfile, setOwnProfile] = useState<{ displayName: string; photoUrl: string | null } | null>(null);
   const [ownStories, setOwnStories] = useState<SerializedStory[]>([]);
@@ -88,6 +106,28 @@ export default function MatchesPage() {
 
     return () => unsubscribe();
   }, [user]);
+
+  // Live presence (online dot) per match — one small single-field listener per uid,
+  // reused across snapshot updates rather than re-subscribing every time.
+  useEffect(() => {
+    if (!firestore) return;
+    const db = firestore;
+    const wantedUids = new Set(rows.map((r) => r.otherUid));
+    wantedUids.forEach((uid) => {
+      if (presenceUnsubsRef.current.has(uid)) return;
+      const unsubscribe = onSnapshot(doc(db, "users", uid), (snap) => {
+        setPresenceByUid((prev) => ({ ...prev, [uid]: snap.data()?.lastActiveAt ?? null }));
+      });
+      presenceUnsubsRef.current.set(uid, unsubscribe);
+    });
+  }, [rows]);
+
+  useEffect(() => {
+    return () => {
+      presenceUnsubsRef.current.forEach((unsubscribe) => unsubscribe());
+      presenceUnsubsRef.current.clear();
+    };
+  }, []);
 
   // Stories go through Server Actions (Admin SDK), not direct client Firestore reads —
   // "is the requester matched with this story's author" can't be expressed as a
@@ -191,93 +231,192 @@ export default function MatchesPage() {
     };
   }, [ownStories, storiesByAuthor, user]);
 
+  const filteredRows = rows.filter((row) => {
+    if (filter === "unread" && user && !isRowUnread(row.conversation, user.uid)) return false;
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return true;
+    return row.otherName.toLowerCase().includes(q) || (row.conversation.lastMessageText ?? "").toLowerCase().includes(q);
+  });
+
+  const unreadCount = user ? rows.filter((row) => isRowUnread(row.conversation, user.uid)).length : 0;
+
   return (
     <div className="container mx-auto py-8 px-4">
       <PageHeader title="Your matches" description="Conversations from mutual Meet Me interest." />
 
-      <div className="mt-6 flex items-center gap-4 overflow-x-auto pb-2">
-        <div className="relative shrink-0">
-          <StoryPreviewTile
-            displayName="Your story"
-            hasActiveStory={ownStories.length > 0}
-            preview={previewMedia.own ?? { kind: "none" }}
-            fallbackPhotoUrl={ownProfile?.photoUrl ?? null}
-            onClick={() =>
-              ownStories.length > 0
-                ? setViewer({
-                    authorUid: user!.uid,
-                    authorName: "Your story",
-                    authorPhotoUrl: ownProfile?.photoUrl ?? null,
-                    stories: ownStories,
-                    isOwn: true,
+      <div className="mt-6 lg:grid lg:grid-cols-[392px_1fr] lg:items-start lg:gap-6">
+        <div className="min-w-0">
+          <div className="flex items-center gap-4 overflow-x-auto pb-2">
+            <div className="relative shrink-0">
+              <StoryPreviewTile
+                displayName="Your story"
+                hasActiveStory={ownStories.length > 0}
+                preview={previewMedia.own ?? { kind: "none" }}
+                fallbackPhotoUrl={ownProfile?.photoUrl ?? null}
+                onClick={() =>
+                  ownStories.length > 0
+                    ? setViewer({
+                        authorUid: user!.uid,
+                        authorName: "Your story",
+                        authorPhotoUrl: ownProfile?.photoUrl ?? null,
+                        stories: ownStories,
+                        isOwn: true,
+                      })
+                    : setComposerOpen(true)
+                }
+              />
+              <button
+                type="button"
+                onClick={() => setComposerOpen(true)}
+                aria-label="Add to your story"
+                className="absolute bottom-1 right-1 rounded-full bg-gradient-vy-purple-pink p-1 border-2 border-background"
+              >
+                <Icons.add className="h-3.5 w-3.5 text-white" />
+              </button>
+            </div>
+
+            {matchesWithActiveStories.map((row) => (
+              <StoryPreviewTile
+                key={row.otherUid}
+                displayName={row.otherName}
+                hasActiveStory
+                preview={previewMedia[row.otherUid] ?? { kind: "none" }}
+                fallbackPhotoUrl={row.otherPhotoUrl}
+                onClick={() =>
+                  setViewer({
+                    authorUid: row.otherUid,
+                    authorName: row.otherName,
+                    authorPhotoUrl: row.otherPhotoUrl,
+                    stories: storiesByAuthor[row.otherUid] ?? [],
+                    isOwn: false,
                   })
-                : setComposerOpen(true)
-            }
-          />
-          <button
-            type="button"
-            onClick={() => setComposerOpen(true)}
-            aria-label="Add to your story"
-            className="absolute bottom-1 right-1 rounded-full bg-gradient-vy-purple-pink p-1 border-2 border-background"
-          >
-            <Icons.add className="h-3.5 w-3.5 text-white" />
-          </button>
+                }
+              />
+            ))}
+          </div>
+
+          <div className="mt-4 flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3.5 py-2.5">
+            <Icons.search className="h-4 w-4 shrink-0 text-muted-foreground" />
+            <input
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search matches"
+              className="flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground focus:outline-none"
+            />
+          </div>
+
+          <div className="mt-3 flex flex-wrap gap-2">
+            {(["all", "unread"] as const).map((f) => {
+              const active = filter === f;
+              return (
+                <button
+                  key={f}
+                  type="button"
+                  onClick={() => setFilter(f)}
+                  className={cn(
+                    "flex items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-sm font-semibold transition-colors",
+                    active
+                      ? "border-vy-purple/50 bg-vy-purple/15 text-fuchsia-300"
+                      : "border-white/10 bg-white/5 text-muted-foreground hover:bg-white/10"
+                  )}
+                >
+                  {f === "all" ? "All" : "Unread"}
+                  {f === "unread" && unreadCount > 0 && <span>{unreadCount}</span>}
+                </button>
+              );
+            })}
+          </div>
+
+          <div className="mt-4 space-y-1">
+            {loading && (
+              <>
+                <Skeleton className="h-16 w-full" />
+                <Skeleton className="h-16 w-full" />
+              </>
+            )}
+
+            {!loading && rows.length === 0 && (
+              <p className="text-muted-foreground text-center py-10">
+                No matches yet. Tap Meet Me at a venue to start meeting people there.
+              </p>
+            )}
+
+            {!loading && rows.length > 0 && filteredRows.length === 0 && (
+              <p className="text-muted-foreground text-center py-10">No matches found.</p>
+            )}
+
+            {filteredRows.map(({ conversation, otherUid, otherName, otherPhotoUrl }) => {
+              const unread = user ? isRowUnread(conversation, user.uid) : false;
+              const mineLast = conversation.lastMessageSenderUid === user?.uid;
+              const otherLastRead = conversation.lastReadAt?.[otherUid] as any;
+              const mineRead =
+                mineLast &&
+                !!otherLastRead &&
+                typeof otherLastRead.toMillis === "function" &&
+                typeof (conversation.lastMessageAt as any)?.toMillis === "function" &&
+                otherLastRead.toMillis() >= (conversation.lastMessageAt as any).toMillis();
+              const isOnline =
+                !!presenceByUid[otherUid] && Date.now() - presenceByUid[otherUid].toMillis() < ONLINE_WINDOW_MS;
+              const isSelected = selectedConversationId === conversation.id;
+
+              return (
+                <Link
+                  key={conversation.id}
+                  href={`/chat/${conversation.id}`}
+                  onClick={(e) => {
+                    if (typeof window !== "undefined" && window.matchMedia(DESKTOP_QUERY).matches) {
+                      e.preventDefault();
+                      setSelectedConversationId(conversation.id);
+                    }
+                  }}
+                  className={cn(
+                    "flex items-center gap-3 rounded-lg border-l-2 border-white/10 bg-white/5 p-3 transition-colors hover:bg-white/10",
+                    isSelected && "lg:border-l-vy-purple lg:bg-vy-purple/10"
+                  )}
+                >
+                  <div className="relative shrink-0">
+                    <Avatar className="h-12 w-12">
+                      {otherPhotoUrl ? <AvatarImage src={otherPhotoUrl} alt={otherName} /> : null}
+                      <AvatarFallback>
+                        <Icons.userRound className="h-6 w-6 text-muted-foreground" />
+                      </AvatarFallback>
+                    </Avatar>
+                    {isOnline && (
+                      <div className="absolute -right-0.5 -bottom-0.5 h-3 w-3 rounded-full border-2 border-background bg-status-green" />
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className={cn("truncate", unread ? "font-bold text-foreground" : "font-medium")}>{otherName}</p>
+                    </div>
+                    <div className="mt-0.5 flex items-center gap-1.5">
+                      {mineLast &&
+                        (mineRead ? (
+                          <Icons.checkCheck className="h-3.5 w-3.5 shrink-0 text-sky-300" />
+                        ) : (
+                          <Icons.check className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+                        ))}
+                      <p className={cn("text-sm truncate", unread ? "font-semibold text-foreground" : "text-muted-foreground")}>
+                        {conversation.lastMessageText || "Say hi!"}
+                      </p>
+                    </div>
+                  </div>
+                  {unread && <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-gradient-vy-purple-pink" />}
+                </Link>
+              );
+            })}
+          </div>
         </div>
 
-        {matchesWithActiveStories.map((row) => (
-          <StoryPreviewTile
-            key={row.otherUid}
-            displayName={row.otherName}
-            hasActiveStory
-            preview={previewMedia[row.otherUid] ?? { kind: "none" }}
-            fallbackPhotoUrl={row.otherPhotoUrl}
-            onClick={() =>
-              setViewer({
-                authorUid: row.otherUid,
-                authorName: row.otherName,
-                authorPhotoUrl: row.otherPhotoUrl,
-                stories: storiesByAuthor[row.otherUid] ?? [],
-                isOwn: false,
-              })
-            }
-          />
-        ))}
-      </div>
-
-      <div className="mt-4 space-y-2">
-        {loading && (
-          <>
-            <Skeleton className="h-16 w-full" />
-            <Skeleton className="h-16 w-full" />
-          </>
-        )}
-
-        {!loading && rows.length === 0 && (
-          <p className="text-muted-foreground text-center py-10">
-            No matches yet. Tap Meet Me at a venue to start meeting people there.
-          </p>
-        )}
-
-        {rows.map(({ conversation, otherUid, otherName, otherPhotoUrl }) => (
-          <Link
-            key={conversation.id}
-            href={`/dashboard/matches/${otherUid}`}
-            className="flex items-center gap-3 rounded-lg border border-white/10 bg-white/5 p-3 hover:bg-white/10 transition-colors"
-          >
-            <Avatar className="h-12 w-12">
-              {otherPhotoUrl ? <AvatarImage src={otherPhotoUrl} alt={otherName} /> : null}
-              <AvatarFallback>
-                <Icons.userRound className="h-6 w-6 text-muted-foreground" />
-              </AvatarFallback>
-            </Avatar>
-            <div className="flex-1 min-w-0">
-              <p className="font-medium truncate">{otherName}</p>
-              <p className="text-sm text-muted-foreground truncate">
-                {conversation.lastMessageText || "Say hi!"}
-              </p>
+        <div className="hidden lg:flex lg:h-[calc(100vh-10rem)] lg:flex-col lg:overflow-hidden lg:rounded-lg lg:border lg:border-white/10">
+          {selectedConversationId ? (
+            <ChatThread conversationId={selectedConversationId} />
+          ) : (
+            <div className="flex flex-1 items-center justify-center p-8 text-center text-sm text-muted-foreground">
+              Select a conversation to start chatting.
             </div>
-          </Link>
-        ))}
+          )}
+        </div>
       </div>
 
       <StoryComposerDialog
