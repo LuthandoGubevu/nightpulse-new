@@ -4,6 +4,23 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
+    // Helpers for the conversations/{conversationId} lastReadAt self-write check below —
+    // a participant may only ever touch their OWN key in that map, never the other
+    // participant's.
+    function otherParticipant(uid, data) {
+      return data.participantUids[0] == uid ? data.participantUids[1] : data.participantUids[0];
+    }
+    function lastReadAtIsSelfOnly(uid, before, after) {
+      let other = otherParticipant(uid, before);
+      let beforeMap = before.get('lastReadAt', {});
+      let afterMap = after.get('lastReadAt', {});
+      // Untouched (e.g. a plain lastMessageAt/lastMessageText update on send) is always
+      // fine; a genuine lastReadAt change must only ever touch the requester's own key.
+      return afterMap == beforeMap
+             || (afterMap.get(uid, null) is timestamp
+                 && afterMap.get(other, null) == beforeMap.get(other, null));
+    }
+
     // Clubs collection:
     // - Any logged-in user (email/password or Google) can read club data.
     // - Only admin accounts can create, update, or delete clubs. email_verified is
@@ -68,6 +85,20 @@ service cloud.firestore {
     match /users/{uid} {
       allow read: if request.auth != null;
       allow write: if false;
+
+      // Presence heartbeat (see usePresenceHeartbeat.ts) — a deliberate, narrow
+      // exception, same spirit as the direct-client chat-message writes below: a
+      // self-only, single-field write is safe without routing through profileActions.ts.
+      // allow create covers a user with no users/{uid} doc yet (never touched Meet Me/the
+      // age prompt) — the heartbeat is the first write, and it must not create anything
+      // beyond that one field; richer profile data still only ever comes from the Admin
+      // SDK, which bypasses these rules entirely.
+      allow create: if request.auth != null
+                    && request.auth.uid == uid
+                    && request.resource.data.keys().hasOnly(['lastActiveAt']);
+      allow update: if request.auth != null
+                    && request.auth.uid == uid
+                    && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['lastActiveAt']);
     }
 
     // "Meet Me" presence — who is opted-in and physically at a club right now:
@@ -98,16 +129,20 @@ service cloud.firestore {
       // Conversation docs are only ever created by expressInterestAction's transaction —
       // never directly by a client. Participants MAY update the denormalized
       // lastMessageAt/lastMessageText preview (used to sort a "your matches" list)
-      // after sending a message directly to the messages subcollection below — every
+      // after sending a message directly to the messages subcollection below, and MAY
+      // update lastReadAt — but only their own entry in that map, never the other
+      // participant's (checked explicitly below, since diff().affectedKeys() only sees
+      // the top-level 'lastReadAt' key change, not which nested uid changed) — every
       // other field is immutable from the client.
       allow read: if request.auth != null && request.auth.uid in resource.data.participantUids;
       allow create, delete: if false;
       allow update: if request.auth != null
                     && request.auth.uid in resource.data.participantUids
-                    && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['lastMessageAt', 'lastMessageText'])
+                    && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['lastMessageAt', 'lastMessageText', 'lastMessageSenderUid', 'lastReadAt'])
                     && request.resource.data.participantUids == resource.data.participantUids
                     && request.resource.data.clubId == resource.data.clubId
-                    && request.resource.data.createdAt == resource.data.createdAt;
+                    && request.resource.data.createdAt == resource.data.createdAt
+                    && lastReadAtIsSelfOnly(request.auth.uid, resource.data, request.resource.data);
 
       match /messages/{messageId} {
         // Unlike every other mutation in this codebase, message sends are a direct
