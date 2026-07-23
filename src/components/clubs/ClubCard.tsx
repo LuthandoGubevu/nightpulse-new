@@ -3,7 +3,7 @@
 
 import { Card, CardContent, CardFooter, CardTitle, CardDescription } from "@/components/ui/card";
 import { Icons } from "@/components/icons";
-import { ClubStatusIndicator } from "./ClubStatusIndicator";
+import { HeatStrip } from "./HeatStrip";
 import { ClubRatingIndicator } from "./ClubRatingIndicator";
 import { SafetyRatingWidget } from "./SafetyRatingWidget";
 import { MeetMeButton } from "@/components/meetme/MeetMeButton";
@@ -20,14 +20,6 @@ export function ClubCard({ club, isHereNow = false }: ClubCardProps) {
   // Raw headcounts are admin-only (Addendum 24) — the club's own status enum is the
   // only capacity signal this card ever receives.
   const status: ClubStatus = club.status ?? "unknown";
-
-  const statusTextMap: Record<ClubStatus, string> = {
-    low: "Not busy",
-    moderate: "Moderately busy",
-    packed: "Packed",
-    "over-packed": "Very Packed",
-    unknown: "Unknown",
-  };
 
   const isAnnouncementActive = () => {
     if (!club.announcementMessage) return false;
@@ -50,29 +42,25 @@ export function ClubCard({ club, isHereNow = false }: ClubCardProps) {
               </div>
               <CardTitle className="text-2xl font-headline mb-1">{club.name}</CardTitle>
             </div>
-            <ClubStatusIndicator status={status} size="lg" />
+            {club.isTrending && (
+              <span className="shrink-0 rounded-full bg-gradient-to-r from-orange-500 to-red-500 px-2.5 py-1 text-[10px] font-extrabold text-white">
+                🔥 HOT
+              </span>
+            )}
           </div>
-          {club.isTrending && (
-             <Badge variant="destructive" className="mb-2 animate-pulse">
-               <Icons.trendingUp className="mr-1 h-3 w-3" /> Trending Now
-             </Badge>
-           )}
           <CardDescription className="text-muted-foreground mb-1 flex items-center">
             <Icons.mapPin className="h-4 w-4 mr-2 flex-shrink-0" />
             {club.address}
           </CardDescription>
-          
+
           {club.distance !== undefined && club.distance !== Infinity && (
             <p className="text-sm text-muted-foreground">
-              <Icons.navigation className="inline h-4 w-4 mr-1" /> 
+              <Icons.navigation className="inline h-4 w-4 mr-1" />
               {club.distance.toFixed(1)} km away
             </p>
           )}
 
-          <div className="flex items-center space-x-2">
-            <Icons.users className="h-5 w-5 text-primary" />
-            <span className="text-sm font-medium">{statusTextMap[status]}</span>
-          </div>
+          <HeatStrip status={status} />
 
           {club.estimatedWaitTime && (
             <div className="flex items-center space-x-2">
