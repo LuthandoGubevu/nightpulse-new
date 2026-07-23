@@ -74,7 +74,7 @@ export default function LandingPage() {
 
       <div
         ref={containerRef}
-        className="vy-landing mx-auto w-full max-w-[440px] relative overflow-hidden"
+        className="vy-landing vy-container mx-auto w-full max-w-[440px] md:max-w-[640px] lg:max-w-[1100px] relative overflow-hidden"
         style={{ background: "#08060f", color: "#f4f1fa", boxShadow: "0 0 120px rgba(168,85,247,0.15)" }}
       >
         {/* ============ HERO ============ */}
@@ -104,7 +104,7 @@ export default function LandingPage() {
             <div style={{ display: "inline-flex", alignItems: "center", gap: 7, padding: "6px 13px", borderRadius: 999, background: "rgba(168,85,247,0.16)", border: "1px solid rgba(192,132,252,0.35)", fontSize: 12, fontWeight: 600, color: "#e9d5ff", marginBottom: 16 }}>
               🎉 Real-time nightlife, tonight
             </div>
-            <h1 style={{ fontFamily: SPACE_GROTESK, fontWeight: 700, fontSize: 46, lineHeight: 1.02, letterSpacing: "-1px", margin: "0 0 14px" }}>
+            <h1 className="vy-h1" style={{ fontFamily: SPACE_GROTESK, fontWeight: 700, fontSize: 46, lineHeight: 1.02, letterSpacing: "-1px", margin: "0 0 14px" }}>
               Feel the{" "}
               <span style={{ background: "linear-gradient(115deg, #c084fc, #ec4899)", WebkitBackgroundClip: "text", backgroundClip: "text", WebkitTextFillColor: "transparent" }}>
                 Vybe
@@ -112,7 +112,7 @@ export default function LandingPage() {
               <br />
               of the Night
             </h1>
-            <p style={{ fontSize: 16, lineHeight: 1.5, color: "#c9c2da", margin: "0 0 22px", maxWidth: 340 }}>
+            <p className="vy-hero-subtitle" style={{ fontSize: 16, lineHeight: 1.5, color: "#c9c2da", margin: "0 0 22px", maxWidth: 340 }}>
               Real-time nightclub crowd insights, plus <strong style={{ color: "#f4f1fa", fontWeight: 700 }}>Meet&nbsp;Me</strong> — an opt-in way to meet new people at the venues you&apos;re already at.
             </p>
             <Link
@@ -135,7 +135,7 @@ export default function LandingPage() {
         <section style={{ padding: "46px 22px 10px" }}>
           <div data-reveal="" style={{ opacity: 0, transform: "translateY(24px)", transition: "all .7s cubic-bezier(.2,.7,.2,1)" }}>
             <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: 2, color: "#c084fc", textTransform: "uppercase", marginBottom: 8 }}>The night, in real time</div>
-            <h2 style={{ fontFamily: SPACE_GROTESK, fontWeight: 700, fontSize: 30, lineHeight: 1.08, letterSpacing: "-0.5px", margin: "0 0 22px" }}>
+            <h2 className="vy-h2" style={{ fontFamily: SPACE_GROTESK, fontWeight: 700, fontSize: 30, lineHeight: 1.08, letterSpacing: "-0.5px", margin: "0 0 22px" }}>
               See where the energy is — before you leave home.
             </h2>
           </div>
@@ -182,7 +182,7 @@ export default function LandingPage() {
           </div>
 
           {/* venue meters + capacity ring */}
-          <div data-reveal="" style={{ opacity: 0, transform: "translateY(28px)", transition: "all .8s cubic-bezier(.2,.7,.2,1) .1s", display: "grid", gridTemplateColumns: "1fr", gap: 12, marginTop: 12 }}>
+          <div className="vy-grid-meters" data-reveal="" style={{ opacity: 0, transform: "translateY(28px)", transition: "all .8s cubic-bezier(.2,.7,.2,1) .1s", display: "grid", gridTemplateColumns: "1fr", gap: 12, marginTop: 12 }}>
             <div style={{ borderRadius: 22, padding: 20, background: "linear-gradient(160deg, #161022 0%, #0d0a17 100%)", border: "1px solid rgba(255,255,255,0.06)" }}>
               <div style={{ fontSize: 13, fontWeight: 700, color: "#d8b4fe", marginBottom: 15 }}>Hotspots near you</div>
               <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
@@ -238,10 +238,10 @@ export default function LandingPage() {
 
         {/* ============ HOW IT WORKS ============ */}
         <section style={{ padding: "46px 22px 10px" }}>
-          <h2 data-reveal="" style={{ opacity: 0, transform: "translateY(24px)", transition: "all .7s cubic-bezier(.2,.7,.2,1)", fontFamily: SPACE_GROTESK, fontWeight: 700, fontSize: 30, letterSpacing: "-0.5px", margin: "0 0 24px", textAlign: "center" }}>
+          <h2 data-reveal="" className="vy-h2" style={{ opacity: 0, transform: "translateY(24px)", transition: "all .7s cubic-bezier(.2,.7,.2,1)", fontFamily: SPACE_GROTESK, fontWeight: 700, fontSize: 30, letterSpacing: "-0.5px", margin: "0 0 24px", textAlign: "center" }}>
             How <span style={{ color: "#c084fc" }}>Vybi</span> Works
           </h2>
-          <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+          <div className="vy-grid-steps" style={{ display: "flex", flexDirection: "column", gap: 14 }}>
             <div data-reveal="" style={{ opacity: 0, transform: "translateY(24px)", transition: "all .7s cubic-bezier(.2,.7,.2,1)", display: "flex", gap: 16, alignItems: "center", padding: 20, borderRadius: 20, background: "linear-gradient(135deg, rgba(129,140,248,0.14), rgba(14,10,23,0.6))", border: "1px solid rgba(129,140,248,0.2)" }}>
               <div style={{ flexShrink: 0, width: 60, height: 60, borderRadius: 16, background: "linear-gradient(135deg,#4338ca,#818cf8)", display: "flex", alignItems: "center", justifyContent: "center", animation: "vy-float 4s ease-in-out infinite" }}>
                 <svg width="26" height="26" viewBox="0 0 24 24" fill="none"><rect x={6} y={2.5} width={12} height={19} rx={3} stroke="#fff" strokeWidth={1.8} /><line x1={10} y1={18.5} x2={14} y2={18.5} stroke="#fff" strokeWidth={1.8} strokeLinecap="round" /></svg>
@@ -302,10 +302,10 @@ export default function LandingPage() {
 
         {/* ============ WHY YOU'LL LOVE VYBI ============ */}
         <section style={{ padding: "46px 22px 10px" }}>
-          <h2 data-reveal="" style={{ opacity: 0, transform: "translateY(24px)", transition: "all .7s cubic-bezier(.2,.7,.2,1)", fontFamily: SPACE_GROTESK, fontWeight: 700, fontSize: 30, letterSpacing: "-0.5px", margin: "0 0 24px", textAlign: "center" }}>
+          <h2 data-reveal="" className="vy-h2" style={{ opacity: 0, transform: "translateY(24px)", transition: "all .7s cubic-bezier(.2,.7,.2,1)", fontFamily: SPACE_GROTESK, fontWeight: 700, fontSize: 30, letterSpacing: "-0.5px", margin: "0 0 24px", textAlign: "center" }}>
             Why You&apos;ll Love <span style={{ color: "#ec4899" }}>Vybi</span>
           </h2>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+          <div className="vy-grid-love" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
             <div data-reveal="" style={{ opacity: 0, transform: "translateY(24px)", transition: "all .7s cubic-bezier(.2,.7,.2,1)", borderRadius: 20, padding: 20, background: "linear-gradient(155deg, #1a1330 0%, #0d0a18 100%)", border: "1px solid rgba(168,85,247,0.18)" }}>
               <div style={{ width: 42, height: 42, borderRadius: 12, background: "rgba(168,85,247,0.18)", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 13 }}>
                 <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><circle cx={12} cy={12} r={9} stroke="#c084fc" strokeWidth={1.8} /><path d="M8.5 12l2.3 2.3L15.5 9" stroke="#c084fc" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" /></svg>
@@ -344,14 +344,14 @@ export default function LandingPage() {
         <section style={{ padding: "46px 22px 10px" }}>
           <div data-reveal="" style={{ opacity: 0, transform: "translateY(24px)", transition: "all .7s cubic-bezier(.2,.7,.2,1)", textAlign: "center", marginBottom: 6 }}>
             <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: 2, color: "#67e8f9", textTransform: "uppercase", marginBottom: 8 }}>For venues</div>
-            <h2 style={{ fontFamily: SPACE_GROTESK, fontWeight: 700, fontSize: 30, lineHeight: 1.08, letterSpacing: "-0.5px", margin: "0 0 24px" }}>
+            <h2 className="vy-h2" style={{ fontFamily: SPACE_GROTESK, fontWeight: 700, fontSize: 30, lineHeight: 1.08, letterSpacing: "-0.5px", margin: "0 0 24px" }}>
               Why your club should be{" "}
               <span style={{ background: "linear-gradient(115deg, #c084fc, #ec4899)", WebkitBackgroundClip: "text", backgroundClip: "text", WebkitTextFillColor: "transparent" }}>
                 listed on Vybi
               </span>
             </h2>
           </div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          <div className="vy-grid-club" style={{ display: "flex", flexDirection: "column", gap: 12 }}>
             <div data-reveal="" style={{ opacity: 0, transform: "translateY(24px)", transition: "all .7s cubic-bezier(.2,.7,.2,1)", display: "flex", gap: 15, alignItems: "flex-start", padding: 19, borderRadius: 20, background: "linear-gradient(155deg, #1a1330 0%, #0d0a18 100%)", border: "1px solid rgba(168,85,247,0.2)" }}>
               <div style={{ flexShrink: 0, position: "relative", width: 52, height: 52, borderRadius: 14, background: "linear-gradient(135deg,#7c3aed,#c084fc)", display: "flex", alignItems: "flex-end", justifyContent: "center", gap: 3, padding: "13px 12px" }}>
                 <span style={{ width: 5, background: "#fff", borderRadius: 2, height: "100%", transformOrigin: "bottom", animation: "vy-eq .6s ease-in-out infinite alternate" }} />
