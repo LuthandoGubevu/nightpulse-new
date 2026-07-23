@@ -24,6 +24,11 @@ export const siteConfig = {
       icon: "heart" as keyof typeof Icons,
     },
     {
+      title: "Interested",
+      href: "/dashboard/interested",
+      icon: "view" as keyof typeof Icons,
+    },
+    {
       title: "Manage Clubs",
       href: "/admin/clubs",
       icon: "building" as keyof typeof Icons, 

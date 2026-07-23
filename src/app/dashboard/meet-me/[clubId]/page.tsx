@@ -3,7 +3,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { collection, doc, getDoc, onSnapshot, Timestamp } from "firebase/firestore";
+import { collection, doc, onSnapshot, Timestamp } from "firebase/firestore";
 import { auth, firestore } from "@/lib/firebase";
 import { expressInterestAction } from "@/actions/meetMeActions";
 import { blockUserAction } from "@/actions/profileActions";
@@ -29,6 +29,12 @@ function timeAgo(timestamp?: Timestamp) {
   return `${Math.round(minutes / 60)}h ago`;
 }
 
+// The expiry check below compares each presence doc's expiresAt against the VIEWER's own
+// device clock — two people standing next to each other can have clocks that disagree by
+// a few minutes, which was enough to make one person's still-valid presence look expired
+// only to the other. A few minutes of tolerance is negligible against the 4h presence TTL.
+const CLOCK_SKEW_TOLERANCE_MS = 5 * 60 * 1000;
+
 export default function MeetMePeoplePage() {
   const { clubId } = useParams<{ clubId: string }>();
   const router = useRouter();
@@ -40,16 +46,23 @@ export default function MeetMePeoplePage() {
   const [pendingUids, setPendingUids] = useState<Set<string>>(new Set());
   const [interestedUids, setInterestedUids] = useState<Set<string>>(new Set());
   const [reportTarget, setReportTarget] = useState<{ uid: string; name: string } | null>(null);
+  const [listenerError, setListenerError] = useState(false);
+  const [retryKey, setRetryKey] = useState(0);
 
   const currentUid = auth?.currentUser?.uid;
 
+  // Live (not one-time) so a block taking effect elsewhere is reflected without a remount.
   useEffect(() => {
     if (!firestore || !currentUid) return;
-
-    (async () => {
-      const snap = await getDoc(doc(firestore!, "users", currentUid));
+    const unsubscribe = onSnapshot(doc(firestore, "users", currentUid), (snap) => {
       setBlockedUids(snap.data()?.blockedUids ?? []);
-    })();
+    });
+    return () => unsubscribe();
+  }, [currentUid]);
+
+  useEffect(() => {
+    if (!firestore || !currentUid) return;
+    setListenerError(false);
 
     const unsubscribe = onSnapshot(
       collection(firestore, "clubs", clubId, "meetMePresence"),
@@ -57,18 +70,22 @@ export default function MeetMePeoplePage() {
         const now = Timestamp.now();
         const list = querySnapshot.docs
           .map((d) => ({ id: d.id, ...(d.data() as any) }) as MeetMePresenceWithId)
-          .filter((p) => p.id !== currentUid && p.expiresAt?.toMillis?.() > now.toMillis());
+          .filter(
+            (p) => p.id !== currentUid && (p.expiresAt?.toMillis?.() ?? 0) > now.toMillis() - CLOCK_SKEW_TOLERANCE_MS
+          );
         setPeople(list);
         setLoading(false);
       },
       (error) => {
+        // Firestore doesn't auto-retry after a terminal error like permission-denied —
+        // surface a distinguishable state instead of silently looking like an empty room.
         console.error("Error listening to Meet Me presence:", error);
-        toast({ title: "Error", description: "Could not load who's here.", variant: "destructive" });
+        setListenerError(true);
         setLoading(false);
       }
     );
     return () => unsubscribe();
-  }, [clubId, currentUid, toast]);
+  }, [clubId, currentUid, retryKey]);
 
   const visiblePeople = useMemo(
     () => people.filter((p) => !blockedUids.includes(p.id)),
@@ -132,13 +149,22 @@ export default function MeetMePeoplePage() {
           </>
         )}
 
-        {!loading && visiblePeople.length === 0 && (
+        {!loading && listenerError && (
+          <div className="text-center py-12 space-y-3">
+            <p className="text-sm text-muted-foreground">Couldn&apos;t load who&apos;s here.</p>
+            <Button variant="outline" size="sm" onClick={() => setRetryKey((k) => k + 1)}>
+              <Icons.spinner className="mr-2 h-4 w-4" /> Retry
+            </Button>
+          </div>
+        )}
+
+        {!loading && !listenerError && visiblePeople.length === 0 && (
           <p className="text-sm text-muted-foreground text-center py-12">
             No one else here yet. Check back soon.
           </p>
         )}
 
-        {visiblePeople.map((person) => {
+        {!listenerError && visiblePeople.map((person) => {
           const isInterested = interestedUids.has(person.id);
           const isPending = pendingUids.has(person.id);
           const joined = timeAgo(person.createdAt);
