@@ -25,10 +25,16 @@ interface ExistingProfile {
   lookingFor?: LookingFor;
 }
 
+type PresenceStatus = "checking" | "optedOut" | "optedIn";
+
 export function MeetMeButton({ clubId }: MeetMeButtonProps) {
   const { toast } = useToast();
   const router = useRouter();
-  const [isOptedIn, setIsOptedIn] = useState(false);
+  // "checking" (not just a boolean defaulting to false) so a fresh mount — e.g. after
+  // the geofence hook's `isHereNow` flaps and ClubCard remounts this whole component —
+  // doesn't flash "Meet Me" before the mount-time restore below resolves.
+  const [status, setStatus] = useState<PresenceStatus>("checking");
+  const isOptedIn = status === "optedIn";
   const [isBusy, setIsBusy] = useState(false);
   const [showProfileDialog, setShowProfileDialog] = useState(false);
   const [showLookingForPrompt, setShowLookingForPrompt] = useState(false);
@@ -38,23 +44,34 @@ export function MeetMeButton({ clubId }: MeetMeButtonProps) {
   // page — that's an in-feature route change, not the user leaving the venue.
   const skipCleanupRef = useRef(false);
 
+  // Cleanup effects only run against what they closed over at registration time — kept
+  // in sync via a ref so the unmount cleanup below always sees the latest status without
+  // needing to re-run (and re-register) the whole effect on every status change.
+  const statusRef = useRef(status);
+  useEffect(() => {
+    statusRef.current = status;
+  }, [status]);
+
   // On mount, check whether a presence doc already exists for this club (e.g. the user
   // opted in, then navigated to the People Here page and back — the button itself
   // remounts fresh each time, so without this it would wrongly show "Meet Me" again
   // while the user is actually still visible).
   useEffect(() => {
     let cancelled = false;
+    setStatus("checking");
     (async () => {
       const uid = auth?.currentUser?.uid;
-      if (!uid || !firestore) return;
+      if (!uid || !firestore) {
+        if (!cancelled) setStatus("optedOut");
+        return;
+      }
       try {
         const snap = await getDoc(doc(firestore, "clubs", clubId, "meetMePresence", uid));
-        if (!cancelled && snap.exists()) {
-          setIsOptedIn(true);
-        }
+        if (!cancelled) setStatus(snap.exists() ? "optedIn" : "optedOut");
       } catch {
         // The read rule's self-existence check fails when our own presence doc doesn't
         // exist, which surfaces as permission-denied — that just means "not opted in".
+        if (!cancelled) setStatus("optedOut");
       }
     })();
     return () => {
@@ -65,15 +82,16 @@ export function MeetMeButton({ clubId }: MeetMeButtonProps) {
   // Instant invisibility: if this card unmounts because the user left the geofence
   // (not because they navigated to the People Here page — see skipCleanupRef above),
   // clear presence immediately rather than leaving it to the multi-hour TTL policy.
+  // Reads statusRef (not `status` directly) so this always sees the latest value even
+  // though the effect itself is only registered once per `clubId`.
   useEffect(() => {
     return () => {
-      if (isOptedIn && !skipCleanupRef.current) {
+      if (statusRef.current === "optedIn" && !skipCleanupRef.current) {
         auth?.currentUser?.getIdToken().then((idToken) => {
           if (idToken) optOutMeetMeAction(idToken, clubId);
         });
       }
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [clubId]);
 
   const goToPeoplePage = () => {
@@ -93,7 +111,7 @@ export function MeetMeButton({ clubId }: MeetMeButtonProps) {
     setShowLookingForPrompt(false);
 
     if (result.success) {
-      setIsOptedIn(true);
+      setStatus("optedIn");
       goToPeoplePage();
     } else {
       toast({ title: "Couldn't opt in", description: result.error || "An unexpected error occurred.", variant: "destructive" });
@@ -113,7 +131,7 @@ export function MeetMeButton({ clubId }: MeetMeButtonProps) {
       const result = await optOutMeetMeAction(idToken, clubId);
       setIsBusy(false);
       if (result.success) {
-        setIsOptedIn(false);
+        setStatus("optedOut");
       } else {
         toast({ title: "Couldn't opt out", description: result.error || "An unexpected error occurred.", variant: "destructive" });
       }
@@ -157,6 +175,21 @@ export function MeetMeButton({ clubId }: MeetMeButtonProps) {
       setShowLookingForPrompt(true);
     }
   };
+
+  // While the mount-time restore is in flight, render a disabled neutral placeholder
+  // instead of "Meet Me" — every remount (e.g. ClubCard flapping isHereNow, or returning
+  // from the People Here page) briefly passes through here, and showing the wrong label
+  // for a moment is exactly the flicker this status state exists to avoid.
+  if (status === "checking") {
+    return (
+      <div className="flex items-center gap-2">
+        <Button size="sm" variant="secondary" disabled className="flex-1 min-w-0 truncate">
+          <Icons.spinner className="mr-2 h-4 w-4 animate-spin" />
+          Meet Me
+        </Button>
+      </div>
+    );
+  }
 
   return (
     <>

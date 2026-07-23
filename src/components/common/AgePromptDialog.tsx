@@ -19,6 +19,12 @@ import { Label } from "@/components/ui/label";
 import { Icons } from "@/components/icons";
 import { useToast } from "@/hooks/use-toast";
 
+// Persists across a remount regardless of what triggers it (e.g. dashboard/layout.tsx's
+// authLoading/user gate flipping momentarily on tab refocus/token refresh) — the dialog's
+// own `open` state resets on every remount, so this is the guard that actually sticks for
+// the rest of this browser session once the user has answered or skipped once.
+const SESSION_DISMISSED_KEY = "vybi_age_prompt_dismissed";
+
 /**
  * App-wide, one-time, skippable age prompt for every signed-in user — not
  * gated behind Meet Me. Powers the admin analytics age-distribution chart,
@@ -37,6 +43,9 @@ export function AgePromptDialog() {
   useEffect(() => {
     if (!user || !firestore) {
       setOpen(false);
+      return;
+    }
+    if (typeof window !== "undefined" && sessionStorage.getItem(SESSION_DISMISSED_KEY) === "true") {
       return;
     }
     let cancelled = false;
@@ -58,9 +67,19 @@ export function AgePromptDialog() {
 
   const handleSkip = async () => {
     setOpen(false);
+    if (typeof window !== "undefined") sessionStorage.setItem(SESSION_DISMISSED_KEY, "true");
     const idToken = await auth?.currentUser?.getIdToken().catch(() => undefined);
-    if (idToken) {
-      skipAccountAgeAction(idToken).catch((error) => console.error("Error skipping age prompt:", error));
+    if (!idToken) return;
+    const result = await skipAccountAgeAction(idToken).catch((error) => {
+      console.error("Error skipping age prompt:", error);
+      return null;
+    });
+    if (!result?.success) {
+      toast({
+        title: "Couldn't save",
+        description: result?.error || "Something went wrong, but you won't be asked again this session.",
+        variant: "destructive",
+      });
     }
   };
 
@@ -84,6 +103,7 @@ export function AgePromptDialog() {
         toast({ title: "Couldn't save", description: result.error || "An unexpected error occurred.", variant: "destructive" });
         return;
       }
+      if (typeof window !== "undefined") sessionStorage.setItem(SESSION_DISMISSED_KEY, "true");
       setOpen(false);
     } catch (error: any) {
       toast({ title: "Couldn't save", description: error.message || "An unexpected error occurred.", variant: "destructive" });
