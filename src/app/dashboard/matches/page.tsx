@@ -60,7 +60,22 @@ export default function MatchesPage() {
     authorPhotoUrl: string | null;
     stories: SerializedStory[];
     isOwn: boolean;
+    preloadedMediaUrls?: Record<string, string>;
   } | null>(null);
+
+  // The preview-tile bar already minted a signed URL for the latest story's thumbnail
+  // (previewMedia) — reuse it instead of making StoryViewer mint a fresh one for the
+  // exact same image the moment it opens.
+  const preloadedUrlsFor = useCallback(
+    (key: string, authorStories: SerializedStory[]): Record<string, string> | undefined => {
+      const preview = previewMedia[key];
+      if (preview?.kind !== "image") return undefined;
+      const latestStory = authorStories[authorStories.length - 1];
+      if (!latestStory) return undefined;
+      return { [latestStory.id]: preview.url };
+    },
+    [previewMedia]
+  );
 
   useEffect(() => {
     if (!user || !firestore) {
@@ -261,6 +276,7 @@ export default function MatchesPage() {
                         authorPhotoUrl: ownProfile?.photoUrl ?? null,
                         stories: ownStories,
                         isOwn: true,
+                        preloadedMediaUrls: preloadedUrlsFor("own", ownStories),
                       })
                     : setComposerOpen(true)
                 }
@@ -289,6 +305,7 @@ export default function MatchesPage() {
                     authorPhotoUrl: row.otherPhotoUrl,
                     stories: storiesByAuthor[row.otherUid] ?? [],
                     isOwn: false,
+                    preloadedMediaUrls: preloadedUrlsFor(row.otherUid, storiesByAuthor[row.otherUid] ?? []),
                   })
                 }
               />
@@ -436,6 +453,7 @@ export default function MatchesPage() {
           authorPhotoUrl={viewer.authorPhotoUrl}
           stories={viewer.stories}
           isOwnStory={viewer.isOwn}
+          preloadedMediaUrls={viewer.preloadedMediaUrls}
           onDeleted={() => {
             setViewer(null);
             fetchOwnStories();

@@ -21,6 +21,10 @@ interface StoryViewerProps {
   initialIndex?: number;
   isOwnStory?: boolean;
   onDeleted?: (storyId: string) => void;
+  // Signed URLs already minted elsewhere (e.g. the Matches page's preview-tile bar
+  // already fetched one for the latest story to render the thumbnail) — seeding these
+  // into the cache avoids re-minting a fresh signed URL for the exact same image.
+  preloadedMediaUrls?: Record<string, string>;
 }
 
 // Full-screen tap/auto-advance viewer — DialogContent already renders its own close
@@ -36,6 +40,7 @@ export function StoryViewer({
   initialIndex = 0,
   isOwnStory = false,
   onDeleted,
+  preloadedMediaUrls,
 }: StoryViewerProps) {
   const { toast } = useToast();
   const [index, setIndex] = useState(initialIndex);
@@ -53,6 +58,11 @@ export function StoryViewer({
     if (open) {
       setIndex(Math.min(initialIndex, Math.max(stories.length - 1, 0)));
       setProgress(0);
+      if (preloadedMediaUrls) {
+        for (const [storyId, url] of Object.entries(preloadedMediaUrls)) {
+          mediaCacheRef.current.set(storyId, url);
+        }
+      }
     } else {
       mediaCacheRef.current.clear();
     }
@@ -103,6 +113,30 @@ export function StoryViewer({
       cancelled = true;
     };
   }, [open, current, authorUid, toast]);
+
+  // Prefetch the next story's signed URL (and warm the browser's own HTTP cache for its
+  // bytes) while the current one is still showing — without this, every auto-advance or
+  // swipe pays the same mint-then-fetch round trip the current story just paid.
+  useEffect(() => {
+    if (!open) return;
+    const next = stories[index + 1];
+    if (!next || next.mediaType !== "image" || !next.mediaPath || mediaCacheRef.current.has(next.id)) {
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      const idToken = await auth?.currentUser?.getIdToken();
+      if (!idToken || cancelled) return;
+      const result = await getStoryMediaUrlAction(idToken, authorUid, next.id);
+      if (cancelled || !result?.success || !result.url) return;
+      mediaCacheRef.current.set(next.id, result.url);
+      const preloadImage = new Image();
+      preloadImage.src = result.url;
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [open, index, stories, authorUid]);
 
   const goNext = () => {
     if (index >= stories.length - 1) {
