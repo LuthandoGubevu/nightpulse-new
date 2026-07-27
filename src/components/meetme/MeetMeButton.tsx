@@ -231,7 +231,6 @@ export function MeetMeButton({ clubId }: MeetMeButtonProps) {
       <LookingForPrompt
         open={showLookingForPrompt}
         onOpenChange={setShowLookingForPrompt}
-        initialLookingFor={existingProfile?.lookingFor}
         isSubmitting={isBusy}
         onConfirm={completeOptIn}
       />
