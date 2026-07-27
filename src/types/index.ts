@@ -94,6 +94,10 @@ export interface UserProfile {
   // authenticated page is open — the one field on this doc clients may self-write.
   // "Online" = updated within the last ~2 minutes; otherwise shown as "last seen ...".
   lastActiveAt?: Timestamp;
+  // Written directly by the client when /dashboard/interested is opened — same
+  // self-only-field pattern as lastActiveAt. Powers the "Interested" nav badge: an
+  // incoming interest with createdAt after this counts as unseen.
+  interestsLastSeenAt?: Timestamp;
 }
 
 // clubs/{clubId}/meetMePresence/{uid} — a snapshot of the user's profile taken at
@@ -119,6 +123,10 @@ export interface Interest {
   fromUid: string;
   toUid: string;
   createdAt: Timestamp;
+}
+
+export interface InterestWithId extends Interest {
+  id: string;
 }
 
 // conversations/{conversationId}, id = sorted uid pair "{uidA}_{uidB}"

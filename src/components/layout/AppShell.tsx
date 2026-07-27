@@ -1,10 +1,11 @@
 
 "use client";
 
-import React, { useMemo } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
 import { signOut } from "firebase/auth";
+import { collection, doc, onSnapshot, query, where } from "firebase/firestore";
 import {
   Sidebar,
   SidebarContent,
@@ -21,7 +22,7 @@ import { siteConfig } from "@/config/site";
 import { Icons } from "@/components/icons";
 import { useAuth } from "@/hooks/useAuth";
 import { usePresenceHeartbeat } from "@/hooks/usePresenceHeartbeat";
-import { auth } from "@/lib/firebase";
+import { auth, firestore } from "@/lib/firebase";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -38,6 +39,38 @@ export default function AppShell({ children }: AppShellProps) {
   const { toast } = useToast();
   const { isMobile, setOpenMobile } = useSidebar();
   usePresenceHeartbeat(user?.uid);
+
+  // "Interested" nav badge — unseen count of incoming Meet Me interest since the user
+  // last opened /dashboard/interested (see InterestedPage, which writes
+  // interestsLastSeenAt on mount). Live on both halves so the badge clears immediately
+  // after a visit, without needing a full reload.
+  const [interestsLastSeenAt, setInterestsLastSeenAt] = useState<any>(null);
+  const [interestedBadgeCount, setInterestedBadgeCount] = useState(0);
+
+  useEffect(() => {
+    if (!user || !firestore) {
+      setInterestsLastSeenAt(null);
+      return;
+    }
+    const unsubscribe = onSnapshot(doc(firestore, "users", user.uid), (snap) => {
+      setInterestsLastSeenAt(snap.data()?.interestsLastSeenAt ?? null);
+    });
+    return () => unsubscribe();
+  }, [user]);
+
+  useEffect(() => {
+    if (!user || !firestore) {
+      setInterestedBadgeCount(0);
+      return;
+    }
+    const q = query(collection(firestore, "interests"), where("toUid", "==", user.uid));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const thresholdMillis = interestsLastSeenAt?.toMillis?.() ?? 0;
+      const count = snapshot.docs.filter((d) => (d.data().createdAt?.toMillis?.() ?? 0) > thresholdMillis).length;
+      setInterestedBadgeCount(count);
+    });
+    return () => unsubscribe();
+  }, [user, interestsLastSeenAt]);
 
   const closeSidebarOnMobile = () => {
     if (isMobile) setOpenMobile(false);
@@ -118,7 +151,12 @@ export default function AppShell({ children }: AppShellProps) {
                       >
                         <Link href={item.href} onClick={closeSidebarOnMobile}>
                           {IconComponent && <IconComponent className="h-4 w-4" />}
-                          <span className="group-data-[collapsible=icon]:hidden">{item.title}</span>
+                          <span className="group-data-[collapsible=icon]:hidden flex-1">{item.title}</span>
+                          {item.href === "/dashboard/interested" && interestedBadgeCount > 0 && (
+                            <span className="group-data-[collapsible=icon]:hidden ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-gradient-vy-purple-pink px-1.5 text-[11px] font-bold text-white">
+                              {interestedBadgeCount}
+                            </span>
+                          )}
                         </Link>
                       </SidebarMenuButton>
                     </SidebarMenuItem>

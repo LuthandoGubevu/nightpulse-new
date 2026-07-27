@@ -16,7 +16,6 @@ import type { LookingFor } from "@/types";
 interface LookingForPromptProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  initialLookingFor?: LookingFor;
   onConfirm: (lookingFor: LookingFor) => void;
   isSubmitting?: boolean;
 }
@@ -25,20 +24,21 @@ interface LookingForPromptProps {
  * Shown on every check-in for a returning user (whose name/photo/age/gender are
  * already set) — deliberately separate from ProfileSetupDialog, since "what am I
  * looking for tonight" can change venue to venue and shouldn't silently carry over
- * from wherever the user last checked in.
+ * from wherever the user last checked in. Never pre-selects an option — Continue stays
+ * disabled until the user actively taps Friends or Love, so reconfirming can't be
+ * habit-tapped through without the choice actually registering.
  */
 export function LookingForPrompt({
   open,
   onOpenChange,
-  initialLookingFor,
   onConfirm,
   isSubmitting,
 }: LookingForPromptProps) {
-  const [lookingFor, setLookingFor] = useState<LookingFor>(initialLookingFor ?? "friends");
+  const [lookingFor, setLookingFor] = useState<LookingFor | null>(null);
 
   useEffect(() => {
-    if (open) setLookingFor(initialLookingFor ?? "friends");
-  }, [open, initialLookingFor]);
+    if (open) setLookingFor(null);
+  }, [open]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -68,7 +68,11 @@ export function LookingForPrompt({
         </div>
 
         <DialogFooter>
-          <Button onClick={() => onConfirm(lookingFor)} disabled={isSubmitting} className="w-full sm:w-auto">
+          <Button
+            onClick={() => lookingFor && onConfirm(lookingFor)}
+            disabled={isSubmitting || lookingFor === null}
+            className="w-full sm:w-auto"
+          >
             {isSubmitting && <Icons.spinner className="mr-2 h-4 w-4 animate-spin" />}
             Continue
           </Button>

@@ -6,10 +6,18 @@ import type { ClubWithId, UserLocation } from '@/types';
 import { getDistanceMeters } from '@/lib/utils';
 import { useToast } from './use-toast';
 
-const GEOFENCE_CHECK_IN_RADIUS_METERS = 45; // Radius for considering a user "entering" a club geofence
-const GEOFENCE_CHECK_OUT_RADIUS_METERS = 60; // Radius for considering a user "exiting" a club geofence (must be > check-in)
+// Widened from 45/60m — that was tighter than typical smartphone GPS accuracy at a real
+// (often indoor/dense) venue, so only whoever was standing right on the club's exact
+// pinned coordinate ever triggered auto check-in.
+const GEOFENCE_CHECK_IN_RADIUS_METERS = 75; // Radius for considering a user "entering" a club geofence
+const GEOFENCE_CHECK_OUT_RADIUS_METERS = 100; // Radius for considering a user "exiting" a club geofence (must be > check-in)
 const ACTION_COOLDOWN_MS = 60 * 1000; // 60 seconds cooldown between geofence actions
 const LOCATION_DEBOUNCE_MS = 1500; // 1.5 seconds debounce for location updates
+// A single noisy GPS sample landing just outside the check-out radius right as the
+// cooldown lapses was enough to flip a user "out" and back "in" every ~60s while
+// genuinely stationary — require this many consecutive out-of-range readings before
+// actually treating it as an exit.
+const CONSECUTIVE_EXIT_READINGS_REQUIRED = 2;
 
 interface UseGeofenceAutoCheckinProps {
   clubs: ClubWithId[];
@@ -31,9 +39,10 @@ export function useGeofenceAutoCheckin({
   const { toast } = useToast();
   const [locationError, setLocationError] = useState<string | null>(null); 
 
-  const determinedClubIdRef = useRef<string | null>(null); 
-  const lastActionTimestampRef = useRef<number>(0); 
+  const determinedClubIdRef = useRef<string | null>(null);
+  const lastActionTimestampRef = useRef<number>(0);
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const consecutiveExitReadingsRef = useRef<number>(0);
 
   const processLocationUpdate = useCallback((currentLat: number, currentLng: number) => {
     let closestEligibleClubForCheckIn: ClubWithId | null = null;
@@ -64,16 +73,26 @@ export function useGeofenceAutoCheckin({
         );
 
         if (distanceToCurrentDeterminedClub > GEOFENCE_CHECK_OUT_RADIUS_METERS) {
+          consecutiveExitReadingsRef.current += 1;
+          // A single noisy sample outside the check-out radius isn't enough to exit —
+          // require several in a row (reset below the moment a reading comes back in
+          // range) so ordinary GPS jitter can't flap presence while stationary.
+          if (consecutiveExitReadingsRef.current < CONSECUTIVE_EXIT_READINGS_REQUIRED) {
+            return;
+          }
           if (canPerformAction) {
             toast({ title: "Geofence Left", description: `You have left the vicinity of ${currentDeterminedClub.name}.` });
             onGeofenceChange(null);
             determinedClubIdRef.current = null;
             lastActionTimestampRef.current = now;
+            consecutiveExitReadingsRef.current = 0;
           } else {
             toast({ title: "Cooldown Active", description: `Exited ${currentDeterminedClub.name} vicinity, change will reflect shortly.`, duration: 3000 });
           }
-          return; 
+          return;
         }
+        // Back within the check-out radius — clear any partial exit confirmation.
+        consecutiveExitReadingsRef.current = 0;
       }
     }
 
@@ -84,6 +103,7 @@ export function useGeofenceAutoCheckin({
           onGeofenceChange(closestEligibleClubForCheckIn.id);
           determinedClubIdRef.current = closestEligibleClubForCheckIn.id;
           lastActionTimestampRef.current = now;
+          consecutiveExitReadingsRef.current = 0;
         } else {
             toast({ title: "Cooldown Active", description: `Near ${closestEligibleClubForCheckIn.name}, change will reflect shortly.`, duration: 3000 });
         }

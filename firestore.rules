@@ -95,10 +95,10 @@ service cloud.firestore {
       // SDK, which bypasses these rules entirely.
       allow create: if request.auth != null
                     && request.auth.uid == uid
-                    && request.resource.data.keys().hasOnly(['lastActiveAt']);
+                    && request.resource.data.keys().hasOnly(['lastActiveAt', 'interestsLastSeenAt']);
       allow update: if request.auth != null
                     && request.auth.uid == uid
-                    && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['lastActiveAt']);
+                    && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['lastActiveAt', 'interestsLastSeenAt']);
     }
 
     // "Meet Me" presence — who is opted-in and physically at a club right now:
@@ -116,12 +116,18 @@ service cloud.firestore {
     }
 
     // "Meet Me" one-directional interest ("fromUid is interested in toUid"), doc ID
-    // composed as {clubId}_{fromUid}_{toUid}. All reads/writes go exclusively through
+    // composed as {clubId}_{fromUid}_{toUid}. Writes go exclusively through
     // expressInterestAction (Admin SDK transaction), which detects mutual interest and
     // creates the conversation doc atomically — a client with direct write access could
-    // otherwise fake a match by writing both directions itself.
+    // otherwise fake a match by writing both directions itself, so writes stay fully
+    // locked down. Reads are narrowly opened to the RECIPIENT of a given interest only
+    // (toUid == me) — this powers the "Interested" page/notification so a one-directional
+    // interest isn't invisible to the person it's about. Unlike Stories' collectionGroup
+    // problem, "toUid == request.auth.uid" is a single-field equality a where() query can
+    // prove for every result, so a live onSnapshot listener works fine here.
     match /interests/{interestId} {
-      allow read, write: if false;
+      allow read: if request.auth != null && request.auth.uid == resource.data.toUid;
+      allow write: if false;
     }
 
     // "Meet Me" chat — a conversation only exists once two people have matched.

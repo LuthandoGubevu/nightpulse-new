@@ -113,7 +113,10 @@ export function StoryComposerDialog({ open, onOpenChange, onPosted }: StoryCompo
 
         let uploadBlob: Blob;
         try {
-          uploadBlob = await compressImageForUpload(photoFile!);
+          // Stories are viewed full-screen for ~5s and expire in 24h — not archived or
+          // zoomed into — so a slightly lower quality than the default cuts file size
+          // (and load time) with no visible difference at this viewing context.
+          uploadBlob = await compressImageForUpload(photoFile!, 1600, 0.75);
         } catch (error) {
           // Don't fall back to uploading the original file — it may be a format
           // (e.g. HEIC) the canvas pipeline couldn't decode, and uploading it
