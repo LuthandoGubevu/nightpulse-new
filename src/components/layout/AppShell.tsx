@@ -123,10 +123,12 @@ export default function AppShell({ children }: AppShellProps) {
           variant="sidebar"
           className="border-r border-white/10"
         >
-          <SidebarHeader className="p-4">
+          <SidebarHeader className="p-4 group-data-[collapsible=icon]:p-2">
             <Link href="/dashboard" className="flex items-center space-x-2" onClick={closeSidebarOnMobile}>
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/vybi-mark.png" alt="" className="h-7 w-auto shrink-0" />
+              <img src="/vybi-mark.png" alt="" className="h-7 w-auto shrink-0 group-data-[collapsible=icon]:hidden" />
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/icons/96x96.png" alt="" className="hidden h-8 w-8 shrink-0 rounded-md group-data-[collapsible=icon]:block" />
               <span className="font-bold font-headline text-lg group-data-[collapsible=icon]:hidden bg-gradient-vy-purple-pink bg-clip-text text-transparent">
                 {siteConfig.name}
               </span>
