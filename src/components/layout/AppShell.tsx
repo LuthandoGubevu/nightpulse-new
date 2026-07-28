@@ -125,7 +125,8 @@ export default function AppShell({ children }: AppShellProps) {
         >
           <SidebarHeader className="p-4">
             <Link href="/dashboard" className="flex items-center space-x-2" onClick={closeSidebarOnMobile}>
-              <Icons.logo className="h-7 w-7 text-vy-purple" />
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/vybi-mark.png" alt="" className="h-7 w-auto shrink-0" />
               <span className="font-bold font-headline text-lg group-data-[collapsible=icon]:hidden bg-gradient-vy-purple-pink bg-clip-text text-transparent">
                 {siteConfig.name}
               </span>
@@ -212,7 +213,8 @@ export default function AppShell({ children }: AppShellProps) {
           <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-white/10 bg-background/95 px-4 backdrop-blur supports-[backdrop-filter]:bg-background/60 md:justify-start">
             <div className="md:hidden">
               <Link href="/dashboard" className="flex items-center space-x-2">
-                  <Icons.logo className="h-6 w-6 text-vy-purple" />
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src="/vybi-mark.png" alt="" className="h-6 w-auto shrink-0" />
                   <span className="font-bold font-headline text-base bg-gradient-vy-purple-pink bg-clip-text text-transparent">{siteConfig.name}</span>
               </Link>
             </div>
