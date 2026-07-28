@@ -16,7 +16,8 @@ export function PwaInstallPrompt({ onInstall, onDismiss }: PwaInstallPromptProps
     <div className="fixed bottom-4 right-4 z-50 w-full max-w-sm animate-in slide-in-from-bottom-10 fade-in-50">
       <Card className="shadow-2xl">
         <CardHeader className="p-4 flex flex-row items-start gap-4">
-          <Icons.logo className="h-10 w-10 text-primary mt-1 flex-shrink-0" />
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/vybi-mark.png" alt="" className="h-10 w-auto mt-1 flex-shrink-0" />
           <div>
             <CardTitle className="text-lg font-headline">Install {siteConfig.name}</CardTitle>
             <CardDescription className="text-sm">
