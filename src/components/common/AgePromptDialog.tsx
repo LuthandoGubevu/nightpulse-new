@@ -39,6 +39,7 @@ export function AgePromptDialog() {
   const [open, setOpen] = useState(false);
   const [age, setAge] = useState("");
   const [isSaving, setIsSaving] = useState(false);
+  const [isSkipping, setIsSkipping] = useState(false);
 
   useEffect(() => {
     if (!user || !firestore) {
@@ -66,20 +67,33 @@ export function AgePromptDialog() {
   }, [user]);
 
   const handleSkip = async () => {
-    setOpen(false);
-    if (typeof window !== "undefined") sessionStorage.setItem(SESSION_DISMISSED_KEY, "true");
-    const idToken = await auth?.currentUser?.getIdToken().catch(() => undefined);
-    if (!idToken) return;
-    const result = await skipAccountAgeAction(idToken).catch((error) => {
-      console.error("Error skipping age prompt:", error);
-      return null;
-    });
-    if (!result?.success) {
-      toast({
-        title: "Couldn't save",
-        description: result?.error || "Something went wrong, but you won't be asked again this session.",
-        variant: "destructive",
+    if (isSkipping) return;
+    setIsSkipping(true);
+    try {
+      const idToken = await auth?.currentUser?.getIdToken().catch(() => undefined);
+      if (!idToken) {
+        toast({ title: "Not signed in", description: "Please sign in again.", variant: "destructive" });
+        return;
+      }
+      const result = await skipAccountAgeAction(idToken).catch((error) => {
+        console.error("Error skipping age prompt:", error);
+        return null;
       });
+      if (!result?.success) {
+        toast({
+          title: "Couldn't save",
+          description: result?.error || "Something went wrong — please try again.",
+          variant: "destructive",
+        });
+        return;
+      }
+      // Only mark this dismissed (session-local AND, via the write above, permanently
+      // in Firestore) once the skip has actually been confirmed saved — closing first
+      // and hoping the write lands is exactly what let this silently fail before.
+      if (typeof window !== "undefined") sessionStorage.setItem(SESSION_DISMISSED_KEY, "true");
+      setOpen(false);
+    } finally {
+      setIsSkipping(false);
     }
   };
 
@@ -141,10 +155,11 @@ export function AgePromptDialog() {
           />
         </div>
         <DialogFooter className="gap-2 sm:gap-0">
-          <Button type="button" variant="outline" onClick={handleSkip} disabled={isSaving}>
+          <Button type="button" variant="outline" onClick={handleSkip} disabled={isSaving || isSkipping}>
+            {isSkipping && <Icons.spinner className="mr-2 h-4 w-4 animate-spin" />}
             Not now
           </Button>
-          <Button onClick={handleSave} disabled={isSaving}>
+          <Button onClick={handleSave} disabled={isSaving || isSkipping}>
             {isSaving && <Icons.spinner className="mr-2 h-4 w-4 animate-spin" />}
             Save
           </Button>
